@@ -10,33 +10,102 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as DriverRouteImport } from './routes/driver'
+import { Route as OffersRouteImport } from './routes/offers'
+import { Route as ZiyaratMadinahRouteImport } from './routes/ziyarat.madinah'
+import { Route as ZiyaratMakkahRouteImport } from './routes/ziyarat.makkah'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DriverRoute = DriverRouteImport.update({
+  id: '/driver',
+  path: '/driver',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OffersRoute = OffersRouteImport.update({
+  id: '/offers',
+  path: '/offers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ZiyaratMadinahRoute = ZiyaratMadinahRouteImport.update({
+  id: '/ziyarat/madinah',
+  path: '/ziyarat/madinah',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ZiyaratMakkahRoute = ZiyaratMakkahRouteImport.update({
+  id: '/ziyarat/makkah',
+  path: '/ziyarat/makkah',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/driver': typeof DriverRoute
+  '/offers': typeof OffersRoute
+  '/ziyarat/madinah': typeof ZiyaratMadinahRoute
+  '/ziyarat/makkah': typeof ZiyaratMakkahRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/driver': typeof DriverRoute
+  '/offers': typeof OffersRoute
+  '/ziyarat/madinah': typeof ZiyaratMadinahRoute
+  '/ziyarat/makkah': typeof ZiyaratMakkahRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/driver': typeof DriverRoute
+  '/offers': typeof OffersRoute
+  '/ziyarat/madinah': typeof ZiyaratMadinahRoute
+  '/ziyarat/makkah': typeof ZiyaratMakkahRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/driver'
+    | '/offers'
+    | '/ziyarat/madinah'
+    | '/ziyarat/makkah'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/admin'
+    | '/driver'
+    | '/offers'
+    | '/ziyarat/madinah'
+    | '/ziyarat/makkah'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/driver'
+    | '/offers'
+    | '/ziyarat/madinah'
+    | '/ziyarat/makkah'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
+  DriverRoute: typeof DriverRoute
+  OffersRoute: typeof OffersRoute
+  ZiyaratMadinahRoute: typeof ZiyaratMadinahRoute
+  ZiyaratMakkahRoute: typeof ZiyaratMakkahRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +117,51 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/driver': {
+      id: '/driver'
+      path: '/driver'
+      fullPath: '/driver'
+      preLoaderRoute: typeof DriverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/offers': {
+      id: '/offers'
+      path: '/offers'
+      fullPath: '/offers'
+      preLoaderRoute: typeof OffersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ziyarat/madinah': {
+      id: '/ziyarat/madinah'
+      path: '/ziyarat/madinah'
+      fullPath: '/ziyarat/madinah'
+      preLoaderRoute: typeof ZiyaratMadinahRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ziyarat/makkah': {
+      id: '/ziyarat/makkah'
+      path: '/ziyarat/makkah'
+      fullPath: '/ziyarat/makkah'
+      preLoaderRoute: typeof ZiyaratMakkahRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
+  DriverRoute: DriverRoute,
+  OffersRoute: OffersRoute,
+  ZiyaratMadinahRoute: ZiyaratMadinahRoute,
+  ZiyaratMakkahRoute: ZiyaratMakkahRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
