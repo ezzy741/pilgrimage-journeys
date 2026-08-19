@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as DriverRouteImport } from './routes/driver'
 import { Route as OffersRouteImport } from './routes/offers'
 import { Route as ZiyaratMadinahRouteImport } from './routes/ziyarat.madinah'
 import { Route as ZiyaratMakkahRouteImport } from './routes/ziyarat.makkah'
@@ -17,6 +19,16 @@ import { Route as ZiyaratMakkahRouteImport } from './routes/ziyarat.makkah'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DriverRoute = DriverRouteImport.update({
+  id: '/driver',
+  path: '/driver',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OffersRoute = OffersRouteImport.update({
@@ -37,12 +49,16 @@ const ZiyaratMakkahRoute = ZiyaratMakkahRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/driver': typeof DriverRoute
   '/offers': typeof OffersRoute
   '/ziyarat/madinah': typeof ZiyaratMadinahRoute
   '/ziyarat/makkah': typeof ZiyaratMakkahRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/driver': typeof DriverRoute
   '/offers': typeof OffersRoute
   '/ziyarat/madinah': typeof ZiyaratMadinahRoute
   '/ziyarat/makkah': typeof ZiyaratMakkahRoute
@@ -50,20 +66,43 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/driver': typeof DriverRoute
   '/offers': typeof OffersRoute
   '/ziyarat/madinah': typeof ZiyaratMadinahRoute
   '/ziyarat/makkah': typeof ZiyaratMakkahRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/offers' | '/ziyarat/madinah' | '/ziyarat/makkah'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/driver'
+    | '/offers'
+    | '/ziyarat/madinah'
+    | '/ziyarat/makkah'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/offers' | '/ziyarat/madinah' | '/ziyarat/makkah'
-  id: '__root__' | '/' | '/offers' | '/ziyarat/madinah' | '/ziyarat/makkah'
+  to:
+    | '/'
+    | '/admin'
+    | '/driver'
+    | '/offers'
+    | '/ziyarat/madinah'
+    | '/ziyarat/makkah'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/driver'
+    | '/offers'
+    | '/ziyarat/madinah'
+    | '/ziyarat/makkah'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
+  DriverRoute: typeof DriverRoute
   OffersRoute: typeof OffersRoute
   ZiyaratMadinahRoute: typeof ZiyaratMadinahRoute
   ZiyaratMakkahRoute: typeof ZiyaratMakkahRoute
@@ -76,6 +115,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/driver': {
+      id: '/driver'
+      path: '/driver'
+      fullPath: '/driver'
+      preLoaderRoute: typeof DriverRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/offers': {
@@ -104,6 +157,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
+  DriverRoute: DriverRoute,
   OffersRoute: OffersRoute,
   ZiyaratMadinahRoute: ZiyaratMadinahRoute,
   ZiyaratMakkahRoute: ZiyaratMakkahRoute,
