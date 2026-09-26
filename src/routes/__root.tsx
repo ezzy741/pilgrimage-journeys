@@ -6,6 +6,7 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  useLocation,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
@@ -86,6 +87,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" },
       {
         rel: "stylesheet",
         href: appCss,
@@ -115,12 +119,13 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const location = useLocation();
 
   return (
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <div className="min-h-screen bg-background">
-          <Navbar />
+           {location.pathname !== "/" && <Navbar />}
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
         </div>
