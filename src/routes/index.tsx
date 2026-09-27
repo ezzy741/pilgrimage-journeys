@@ -1,153 +1,94 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, MapPinned } from "lucide-react";
-import makkahImg from "@/assets/makkah.jpg";
-import madinahImg from "@/assets/madinah.jpg";
-import offersImg from "@/assets/offers.jpg";
-import { fareConfigs, promotions } from "@/lib/mock-data";
+import { useMemo, useRef, useState } from "react";
+import { ArrowRight, CalendarDays, Check, ChevronDown, Compass, Heart, MapPin, Menu, Minus, Plus, Search, ShieldCheck, SlidersHorizontal, Sparkles, Star, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useI18n, type Lang } from "@/lib/i18n";
+import { destinations, type Destination } from "@/lib/destinations";
+import hero from "@/assets/hijaz-hero.jpg";
 
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Ziyarat Ride — Makkah & Madinah Ziyarat Transport" },
-      {
-        name: "description",
-        content:
-          "Book trusted Ziyarat rides in Makkah and Madinah. Transparent fares, verified drivers, sedan to minibus options.",
-      },
-      { property: "og:title", content: "Ziyarat Ride — Makkah & Madinah Ziyarat Transport" },
-      {
-        property: "og:description",
-        content: "Trusted Ziyarat transport with transparent fares across Makkah and Madinah.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
-  component: Index,
+  head: () => ({ meta: [
+    { title: "Visit Hijaz — Discover meaningful journeys across Saudi Arabia" },
+    { name: "description", content: "Explore Makkah, Madinah, AlUla and Taif. Discover meaningful places, plan your itinerary and inquire about a journey." },
+    { property: "og:title", content: "Visit Hijaz — Discover meaningful journeys" },
+    { property: "og:description", content: "Explore remarkable destinations and plan a journey through Makkah, Madinah, AlUla and Taif." },
+    { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" },
+  ] }), component: Home,
 });
 
-function Index() {
-  const { t, lang, setLang } = useI18n();
-  const makkah = fareConfigs.find((f) => f.zone === "makkah");
-  const madinah = fareConfigs.find((f) => f.zone === "madinah");
-  const combo = promotions.find((p) => p.targetCard === "combo" && p.active);
-  const langs: Lang[] = ["en", "ar", "ur"];
+const words: Record<Lang, Record<string, string>> = {
+  en: { discover: "Discover", destinations: "Destinations", plan: "My trip", offers: "Offers", eyebrow: "YOUR JOURNEY BEGINS HERE", headline: "Where every journey has a story.", intro: "Discover the soul of the Hijaz. Sacred landmarks, ancient wonders and unforgettable moments, thoughtfully brought together.", explore: "Explore destinations", find: "Find your journey", city: "Destination", anyCity: "Where to?", category: "Experience", anyCategory: "All experiences", date: "Travel date", travelers: "Travelers", search: "Search trips", featured: "PLACES TO REMEMBER", featuredTitle: "Go where wonder takes you", featuredSub: "From timeless landmarks to hidden corners, find a journey that stays with you.", all: "All places", exploreCard: "Explore place", add: "Add to trip", added: "Added", selected: "Your places", empty: "Your trip starts here", emptySub: "Save places you love and build a journey worth remembering.", tip: "Good to know", highlights: "Highlights", request: "Send an inquiry", continue: "Continue", back: "Back", name: "Your name", email: "Email address", phone: "Phone number", notes: "Anything we should know?", submit: "Send inquiry", done: "Your inquiry is ready", doneSub: "This preview does not send inquiries yet. Your trip details are shown here for review.", close: "Close", noResults: "No places match those filters. Try a different destination or experience.", booked: "View ride options", travelersLabel: "travelers", trusted: "Thoughtfully curated journeys", note: "Explore at your own pace", inquire: "Plan this journey", where: "Discover the Hijaz", tripDate: "Travel date", remove: "Remove from trip", formIntro: "Tell us a little about yourself", review: "Review your inquiry", inquiryNote: "Inquiry preview only — no message is sent.", menu: "Menu" },
+  ar: { discover: "اكتشف", destinations: "الوجهات", plan: "رحلتي", offers: "العروض", eyebrow: "رحلتك تبدأ هنا", headline: "لكل رحلة حكاية.", intro: "اكتشف روح الحجاز. معالم مقدسة وعجائب قديمة ولحظات لا تُنسى في رحلة واحدة.", explore: "اكتشف الوجهات", find: "ابحث عن رحلتك", city: "الوجهة", anyCity: "إلى أين؟", category: "التجربة", anyCategory: "كل التجارب", date: "تاريخ السفر", travelers: "المسافرون", search: "ابحث", featured: "أماكن لا تُنسى", featuredTitle: "اتبع شغف الاكتشاف", featuredSub: "من المعالم الخالدة إلى الأماكن الخفية، اختر رحلة تبقى في الذاكرة.", all: "كل الأماكن", exploreCard: "استكشف المكان", add: "أضف للرحلة", added: "تمت الإضافة", selected: "أماكنك", empty: "رحلتك تبدأ هنا", emptySub: "احفظ الأماكن التي تحبها وأنشئ رحلة لا تُنسى.", tip: "نصيحة للزيارة", highlights: "أبرز المعالم", request: "إرسال استفسار", continue: "متابعة", back: "رجوع", name: "اسمك", email: "البريد الإلكتروني", phone: "رقم الهاتف", notes: "ملاحظات إضافية", submit: "إرسال الاستفسار", done: "استفسارك جاهز", doneSub: "هذه معاينة فقط ولا يتم إرسال الاستفسارات بعد. راجع تفاصيل رحلتك هنا.", close: "إغلاق", noResults: "لا توجد أماكن تطابق البحث. جرب وجهة أو تجربة أخرى.", booked: "خيارات التنقل", travelersLabel: "مسافر", trusted: "رحلات مختارة بعناية", note: "اكتشف على راحتك", inquire: "خطط لهذه الرحلة", where: "اكتشف الحجاز", tripDate: "تاريخ السفر", remove: "إزالة من الرحلة", formIntro: "أخبرنا عن نفسك", review: "راجع استفسارك", inquiryNote: "معاينة فقط — لن يتم إرسال أي رسالة.", menu: "القائمة" },
+  ur: { discover: "دریافت کریں", destinations: "منزلیں", plan: "میرا سفر", offers: "آفرز", eyebrow: "آپ کا سفر یہاں سے شروع ہوتا ہے", headline: "ہر سفر کی ایک کہانی ہے۔", intro: "حجاز کی روح دریافت کریں۔ مقدس مقامات، قدیم عجائبات اور یادگار لمحات ایک جگہ۔", explore: "منزلیں دریافت کریں", find: "اپنا سفر تلاش کریں", city: "منزل", anyCity: "کہاں جانا ہے؟", category: "تجربہ", anyCategory: "تمام تجربات", date: "سفر کی تاریخ", travelers: "مسافر", search: "سفر تلاش کریں", featured: "یادگار مقامات", featuredTitle: "حیرت انگیز مقامات کی طرف", featuredSub: "تاریخی مقامات سے پوشیدہ گوشوں تک، اپنا یادگار سفر منتخب کریں۔", all: "تمام مقامات", exploreCard: "مقام دیکھیں", add: "سفر میں شامل کریں", added: "شامل ہوگیا", selected: "آپ کے مقامات", empty: "آپ کا سفر یہاں سے شروع ہوتا ہے", emptySub: "پسندیدہ مقامات محفوظ کریں اور یادگار سفر بنائیں۔", tip: "مفید مشورہ", highlights: "اہم مقامات", request: "استفسار بھیجیں", continue: "آگے", back: "واپس", name: "آپ کا نام", email: "ای میل", phone: "فون نمبر", notes: "مزید کچھ؟", submit: "استفسار بھیجیں", done: "آپ کا استفسار تیار ہے", doneSub: "یہ صرف پیش نظارہ ہے، استفسار ابھی بھیجا نہیں جاتا۔ اپنے سفر کی تفصیل یہاں دیکھیں۔", close: "بند کریں", noResults: "ان فلٹرز کے مطابق کوئی مقام نہیں ملا۔ دوسرا مقام آزمائیں۔", booked: "سواری کے اختیارات", travelersLabel: "مسافر", trusted: "احتیاط سے منتخب سفر", note: "اپنی رفتار سے دریافت کریں", inquire: "سفر کی منصوبہ بندی کریں", where: "حجاز دریافت کریں", tripDate: "سفر کی تاریخ", remove: "سفر سے نکالیں", formIntro: "اپنے بارے میں بتائیں", review: "اپنا استفسار دیکھیں", inquiryNote: "صرف پیش نظارہ — کوئی پیغام نہیں بھیجا جاتا۔", menu: "مینو" },
+};
+const cities = ["Makkah", "Madinah", "Taif", "AlUla"];
+const categories = ["Ziyarat", "Historical Sites", "Hotels", "Guided Tours"];
 
-  return (
-    <main className="px-3 py-3 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-      <div className="mx-auto grid max-w-7xl overflow-hidden border border-border bg-card shadow-card md:grid-cols-[96px_minmax(0,1fr)]">
-        <aside className="flex min-h-16 items-center justify-between gap-4 bg-primary px-4 text-primary-foreground md:min-h-[720px] md:flex-col md:px-2 md:py-8">
-          <Link to="/" aria-label={t("brand")} className="flex items-center gap-2 font-display text-lg font-extrabold uppercase md:my-10 md:[writing-mode:vertical-rl] md:rotate-180">
-            <MapPinned className="size-5 shrink-0 md:rotate-180" /> Ziyarat
-          </Link>
-          <div className="flex items-center gap-1 md:flex-col md:gap-2" aria-label="Language">
-            {langs.map((l) => (
-              <Button key={l} size="sm" variant="ghost" onClick={() => setLang(l)} aria-label={`Switch to ${l}`} aria-pressed={lang === l}
-                className={`h-9 w-9 rounded-none p-0 text-xs font-bold hover:bg-accent hover:text-accent-foreground ${lang === l ? "bg-accent text-accent-foreground" : "text-primary-foreground"}`}
-              >{l.toUpperCase()}</Button>
-            ))}
-          </div>
-        </aside>
-
-        <div className="min-w-0">
-          <nav aria-label="Main navigation" className="flex flex-wrap items-center justify-end gap-x-5 gap-y-2 border-b border-border px-5 py-4 text-xs font-extrabold uppercase sm:px-10 lg:px-14">
-            <Link className="transition-colors hover:text-muted-foreground" to="/offers">{t("nav_offers")}</Link>
-            <Link className="transition-colors hover:text-muted-foreground" to="/driver">{t("nav_driver")}</Link>
-            <Link className="transition-colors hover:text-muted-foreground" to="/admin">{t("nav_admin")}</Link>
-          </nav>
-          <div className="grid lg:min-h-[650px] lg:grid-cols-12">
-            <section className="flex min-w-0 flex-col justify-center px-5 py-12 sm:px-10 lg:col-span-7 lg:px-12 lg:py-14 xl:px-16">
-              <span className="w-fit bg-accent px-3 py-1.5 text-[10px] font-extrabold uppercase text-accent-foreground sm:text-xs">{t("hero_kicker")}</span>
-              <h1 className="mt-7 max-w-full font-display text-[clamp(2.6rem,5vw,5.5rem)] font-extrabold leading-[1.04] uppercase [overflow-wrap:anywhere]">
-                {t("hero_line_1")}<br />
-                <span className="outline-word">{t("hero_line_2")}</span><br />
-                {t("hero_line_3")}
-              </h1>
-              <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg">{t("hero_sub")}</p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <Button asChild size="lg" className="h-12 rounded-none px-6 font-bold uppercase transition-transform hover:-translate-y-1">
-                  <Link to="/ziyarat/makkah">{t("hero_cta")} <ArrowUpRight className="ms-2 size-4" /></Link>
-                </Button>
-                <Button asChild size="lg" variant="outline" className="h-12 rounded-none border-2 border-primary px-6 font-bold uppercase transition-transform hover:-translate-y-1 hover:bg-primary hover:text-primary-foreground">
-                  <Link to="/offers">{t("nav_offers")}</Link>
-                </Button>
-              </div>
-              <div className="mt-14 grid grid-cols-3 gap-2 border-t border-border pt-6 sm:gap-5">
-                <QuickLink to="/ziyarat/makkah" label={t("makkah_title")} detail={`${t("from")} ${makkah?.baseFare ?? 150} ${t("currency")}`} />
-                <QuickLink to="/ziyarat/madinah" label={t("madinah_title")} detail={`${t("from")} ${madinah?.baseFare ?? 120} ${t("currency")}`} />
-                <QuickLink to="/offers" label={t("nav_offers")} detail={combo ? `${combo.discountPercentage}% ${t("discount")}` : t("offers_sub")} />
-              </div>
-            </section>
-
-            <section aria-label="Makkah and Madinah" className="relative min-h-[430px] overflow-hidden bg-secondary lg:col-span-5 lg:min-h-full">
-              <div className="hero-cutout absolute inset-y-0 end-0 h-[78%] w-[88%] overflow-hidden">
-                <img src={makkahImg} alt="Masjid al-Haram in Makkah" className="size-full object-cover" width={1024} height={768} />
-              </div>
-              <div className="absolute bottom-8 start-4 z-10 h-[48%] w-[67%] rotate-3 overflow-hidden border-8 border-card shadow-card sm:start-6 lg:-start-5">
-                <img src={madinahImg} alt="The Prophet's Mosque in Madinah" className="size-full object-cover" width={1024} height={768} />
-              </div>
-              <div className="absolute bottom-5 end-5 z-20 flex size-24 -rotate-12 items-center justify-center rounded-full bg-accent px-3 text-center font-display text-xs font-extrabold uppercase leading-tight text-accent-foreground shadow-card sm:size-28 sm:text-sm">
-                Makkah<br />& Madinah
-              </div>
-            </section>
-          </div>
+function Home() {
+  const { lang, setLang } = useI18n();
+  const w = words[lang];
+  const [city, setCity] = useState("");
+  const [category, setCategory] = useState("");
+  const [date, setDate] = useState("");
+  const [travelers, setTravelers] = useState(2);
+  const [applied, setApplied] = useState({ city: "", category: "" });
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [detail, setDetail] = useState<Destination | null>(null);
+  const [drawer, setDrawer] = useState(false);
+  const [inquiry, setInquiry] = useState(false);
+  const [step, setStep] = useState(1);
+  const [sent, setSent] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const resultsRef = useRef<HTMLElement>(null);
+  const filtered = useMemo(() => destinations.filter(d => (!applied.city || d.city === applied.city) && (!applied.category || d.category === applied.category)), [applied]);
+  const selected = destinations.filter(d => selectedIds.includes(d.id));
+  const toggle = (id: string) => setSelectedIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]);
+  const runSearch = () => { setApplied({ city, category }); window.setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth" }), 50); };
+  const openInquiry = () => { setDetail(null); setDrawer(false); setInquiry(true); setStep(1); setSent(false); setErrors({}); };
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (form.name.trim().length < 2) e.name = "Please enter your name";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Please enter a valid email";
+    if (form.phone.replace(/\D/g, "").length < 7) e.phone = "Please enter a valid phone number";
+    setErrors(e); if (Object.keys(e).length === 0) setStep(2);
+  };
+  return <main className="min-h-screen overflow-x-hidden">
+    <div className="mx-auto max-w-[1500px] px-4 pt-4 sm:px-7 sm:pt-7 lg:px-10">
+      <div className="relative overflow-hidden rounded-[28px] bg-primary shadow-clay sm:rounded-[36px]">
+        <img src={hero} alt="Sandstone mountains of AlUla at sunrise" width={1600} height={1008} className="absolute inset-0 h-full w-full object-cover object-center" />
+        <div className="absolute inset-0 bg-hero-wash" />
+        <header className="relative z-10 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-5 pt-5 text-primary-foreground sm:px-9 sm:pt-8 lg:px-12">
+          <Link to="/" className="flex min-w-0 items-center gap-2.5 font-display text-xl font-bold sm:text-2xl"><span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-card/20 backdrop-blur"><Compass className="size-5" /></span><span className="truncate">visit hijaz<span className="text-accent">.</span></span></Link>
+          <nav aria-label="Main navigation" className="hidden items-center gap-8 text-sm font-bold lg:flex"><a href="#destinations" className="hover:text-accent">{w.destinations}</a><Link to="/offers" className="hover:text-accent">{w.offers}</Link><Button onClick={() => setDrawer(true)} variant="ghost" className="rounded-full border border-primary-foreground/40 px-5 text-primary-foreground hover:bg-card/20 hover:text-primary-foreground"><Heart className="size-4" /> {w.plan} <span className="text-accent">{selected.length}</span></Button></nav>
+          <div className="flex items-center gap-2 lg:hidden"><Button variant="ghost" size="icon" aria-label={w.plan} onClick={() => setDrawer(true)} className="rounded-full bg-card/20 text-primary-foreground"><Heart className="size-5" /></Button><Button variant="ghost" size="icon" aria-label={w.menu} onClick={() => document.getElementById("mobile-nav")?.classList.toggle("hidden")} className="rounded-full bg-card/20 text-primary-foreground"><Menu className="size-5" /></Button></div>
+          <nav id="mobile-nav" className="col-span-2 hidden rounded-2xl bg-card/95 p-4 text-foreground shadow-clay lg:hidden"><a href="#destinations" className="block py-2" onClick={() => document.getElementById("mobile-nav")?.classList.add("hidden")}>{w.destinations}</a><Link to="/offers" className="block py-2">{w.offers}</Link><Link to="/driver" className="block py-2">Driver</Link></nav>
+        </header>
+        <div className="relative z-10 flex min-h-[450px] flex-col justify-center px-6 pb-24 pt-12 text-primary-foreground sm:min-h-[545px] sm:px-12 sm:pb-32 lg:min-h-[580px] lg:px-20">
+          <div className="max-w-[670px]"><span className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary-foreground/40 bg-card/15 px-4 py-2 text-[11px] font-extrabold uppercase backdrop-blur"><Sparkles className="size-3.5 text-accent" />{w.eyebrow}</span><h1 className="max-w-[700px] font-display text-[clamp(2.65rem,5.5vw,5.5rem)] font-bold leading-[1.12]">{w.headline}</h1><p className="mt-6 max-w-lg text-sm leading-7 text-primary-foreground/90 sm:text-base">{w.intro}</p><a href="#destinations" className="mt-8 inline-flex items-center gap-2 font-bold text-primary-foreground underline decoration-accent decoration-2 underline-offset-8">{w.explore}<ArrowRight className="size-4 rtl:rotate-180" /></a></div>
         </div>
+        <div className="absolute bottom-5 end-6 z-10 hidden items-center gap-2 text-xs font-semibold text-primary-foreground/90 sm:flex"><MapPin className="size-4" /> AlUla, Saudi Arabia</div>
       </div>
-      <section className="mx-auto max-w-7xl pb-8 pt-12 sm:pt-16" aria-label="Destinations and offers">
-        <div className="mb-6 flex items-end justify-between gap-4">
-          <div><p className="text-xs font-extrabold uppercase text-muted-foreground">ZIYARAT RIDE / 01</p><h2 className="mt-2 text-2xl font-extrabold uppercase sm:text-3xl">{t("makkah_title")} · {t("madinah_title")}</h2></div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <ServiceCard to="/ziyarat/makkah" image={makkahImg} title={t("makkah_title")} subtitle={t("makkah_sub")} price={`${t("from")} ${makkah?.baseFare ?? 150} ${t("currency")}`} />
-          <ServiceCard to="/ziyarat/madinah" image={madinahImg} title={t("madinah_title")} subtitle={t("madinah_sub")} price={`${t("from")} ${madinah?.baseFare ?? 120} ${t("currency")}`} />
-          <ServiceCard to="/offers" image={offersImg} title={t("offers_title")} subtitle={t("offers_sub")} price={combo?.bannerText ?? t("offers_sub")} badge={combo ? `${combo.discountPercentage}% ${t("discount")}` : undefined} />
+      <section aria-label={w.find} className="relative z-20 mx-auto -mt-12 max-w-[1250px] rounded-[24px] border border-card bg-card p-4 shadow-clay sm:-mt-16 sm:rounded-[28px] sm:p-6 lg:p-7">
+        <div className="mb-4 flex items-center justify-between gap-3"><h2 className="font-display text-lg font-bold sm:text-xl">{w.find}</h2><div className="flex items-center gap-1 rounded-full bg-secondary p-1" aria-label="Language">{(["en", "ar", "ur"] as Lang[]).map(l => <Button key={l} onClick={() => setLang(l)} size="sm" variant={lang === l ? "default" : "ghost"} aria-pressed={lang === l} className="h-7 rounded-full px-2.5 text-[11px]">{l.toUpperCase()}</Button>)}</div></div>
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-[1.1fr_1.15fr_1fr_.7fr_auto] lg:items-end">
+          <label className="search-field"><span><MapPin className="size-4" />{w.city}</span><span className="relative"><select value={city} onChange={e => setCity(e.target.value)} className="search-select"><option value="">{w.anyCity}</option>{cities.map(c => <option key={c}>{c}</option>)}</select><ChevronDown className="pointer-events-none absolute end-0 top-1/2 size-4 -translate-y-1/2" /></span></label>
+          <label className="search-field"><span><SlidersHorizontal className="size-4" />{w.category}</span><span className="relative"><select value={category} onChange={e => setCategory(e.target.value)} className="search-select"><option value="">{w.anyCategory}</option>{categories.map(c => <option key={c}>{c}</option>)}</select><ChevronDown className="pointer-events-none absolute end-0 top-1/2 size-4 -translate-y-1/2" /></span></label>
+          <label className="search-field"><span><CalendarDays className="size-4" />{w.date}</span><input aria-label={w.date} type="date" value={date} onChange={e => setDate(e.target.value)} className="min-w-0 w-full bg-transparent text-sm font-bold outline-none" /></label>
+          <div className="search-field"><span><Users className="size-4" />{w.travelers}</span><div className="flex items-center justify-between gap-2"><Button variant="ghost" size="icon" className="size-6 rounded-full" aria-label="Remove traveler" onClick={() => setTravelers(n => Math.max(1, n-1))}><Minus className="size-3" /></Button><strong className="text-sm">{travelers}</strong><Button variant="ghost" size="icon" className="size-6 rounded-full" aria-label="Add traveler" onClick={() => setTravelers(n => Math.min(20, n+1))}><Plus className="size-3" /></Button></div></div>
+          <Button size="lg" onClick={runSearch} className="h-[68px] rounded-2xl px-7 shadow-clay-button active:translate-y-1 active:shadow-none"><Search className="size-5" />{w.search}</Button>
         </div>
       </section>
-    </main>
-  );
-}
+    </div>
+    <section ref={resultsRef} id="destinations" className="mx-auto max-w-[1500px] scroll-mt-8 px-4 pb-20 pt-20 sm:px-7 sm:pt-24 lg:px-10">
+      <div className="mb-8 flex flex-col justify-between gap-6 sm:flex-row sm:items-end"><div><p className="mb-3 flex items-center gap-2 text-xs font-extrabold uppercase text-accent-foreground"><span className="h-px w-8 bg-accent-foreground" />{w.featured}</p><h2 className="max-w-2xl font-display text-3xl font-bold leading-tight sm:text-4xl">{w.featuredTitle}</h2><p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground">{w.featuredSub}</p></div><Button variant="outline" onClick={() => { setCity(""); setCategory(""); setApplied({ city: "", category: "" }); }} className="w-fit rounded-full px-5">{w.all}<ArrowRight className="size-4" /></Button></div>
+      {filtered.length ? <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">{filtered.map(d => <article key={d.id} className="group overflow-hidden rounded-[24px] bg-card shadow-clay transition-transform duration-300 hover:-translate-y-1"><div className="relative aspect-[4/3] overflow-hidden"><img src={d.image} alt={d.title[lang]} loading="lazy" width={1024} height={768} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" /><span className="absolute start-4 top-4 rounded-full bg-card px-3 py-1.5 text-[11px] font-bold shadow-clay-small">{d.badge}</span><Button variant="secondary" size="icon" onClick={() => toggle(d.id)} aria-label={selectedIds.includes(d.id) ? w.remove : w.add} aria-pressed={selectedIds.includes(d.id)} className="absolute end-4 top-4 size-9 rounded-full shadow-clay-small"><Heart className={`size-4 ${selectedIds.includes(d.id) ? "fill-current" : ""}`} /></Button></div><div className="p-5"><div className="flex items-center justify-between gap-2 text-xs text-muted-foreground"><span className="flex items-center gap-1"><MapPin className="size-3.5" />{d.city}</span><span className="flex items-center gap-1 font-bold text-foreground"><Star className="size-3.5 fill-current text-accent-foreground" />{d.rating}</span></div><h3 className="mt-3 font-display text-lg font-bold">{d.title[lang]}</h3><p className="mt-2 min-h-12 text-sm leading-6 text-muted-foreground">{d.description[lang]}</p><div className="mt-5 flex items-center justify-between border-t border-border pt-4"><span className="text-xs font-semibold text-muted-foreground">{d.duration}</span><Button variant="ghost" onClick={() => setDetail(d)} className="rounded-full px-2 font-bold text-primary">{w.exploreCard}<ArrowRight className="size-4 rtl:rotate-180" /></Button></div></div></article>)}</div> : <div className="rounded-3xl bg-card p-12 text-center text-muted-foreground shadow-clay">{w.noResults}</div>}
+    </section>
+    <section className="bg-secondary py-12"><div className="mx-auto grid max-w-[1500px] gap-5 px-4 text-sm font-semibold sm:grid-cols-3 sm:px-7 lg:px-10"><span className="flex items-center gap-3"><ShieldCheck className="size-6 text-accent-foreground" />{w.trusted}</span><span className="flex items-center gap-3"><Compass className="size-6 text-accent-foreground" />{w.note}</span><Button variant="outline" onClick={() => setDrawer(true)} className="w-fit rounded-full px-6">{w.plan}<ArrowRight className="size-4" /></Button></div></section>
+    <footer className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-4 px-4 py-8 text-sm text-muted-foreground sm:px-7 lg:px-10"><span className="font-display font-bold text-foreground">visit hijaz<span className="text-accent-foreground">.</span></span><span>Journeys worth remembering.</span><div className="flex gap-4"><Link to="/offers">{w.offers}</Link><Link to="/driver">Driver</Link></div></footer>
 
-function QuickLink({ to, label, detail }: { to: string; label: string; detail: string }) {
-  return <Link to={to} className="group min-w-0 text-start">
-    <span className="block break-words font-display text-xs font-bold uppercase transition-colors group-hover:text-muted-foreground sm:text-base">{label}</span>
-    <span className="mt-1 block text-[10px] font-semibold uppercase text-muted-foreground sm:text-xs">{detail}</span>
-  </Link>;
-}
-
-function ServiceCard(props: {
-  to: string;
-  image: string;
-  title: string;
-  subtitle: string;
-  price: string;
-  badge?: string | undefined;
-}) {
-  return (
-    <Link
-      to={props.to}
-      className="group relative block overflow-hidden bg-primary shadow-card transition-transform hover:-translate-y-1"
-    >
-      <img
-        src={props.image}
-        alt={props.title}
-        loading="lazy"
-        width={1024}
-        height={768}
-        className="h-64 w-full object-cover transition-transform duration-500 group-hover:scale-105"
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/40 to-transparent" />
-      {props.badge && (
-        <span className="absolute end-3 top-3 bg-accent px-3 py-1 text-xs font-bold uppercase text-accent-foreground">
-          {props.badge}
-        </span>
-      )}
-      <div className="absolute inset-x-0 bottom-0 p-4 text-primary-foreground">
-        <h3 className="font-display text-lg font-bold uppercase">{props.title}</h3>
-        <p className="text-xs text-primary-foreground/75">{props.subtitle}</p>
-        <p className="mt-2 text-sm font-bold text-primary-foreground">{props.price} <ArrowUpRight className="ms-1 inline size-4" /></p>
-      </div>
-    </Link>
-  );
+    {detail && <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setDetail(null); }}><section role="dialog" aria-modal="true" aria-label={detail.title[lang]} className="modal-panel max-w-3xl"><div className="relative aspect-[16/8] overflow-hidden rounded-t-[24px]"><img src={detail.image} alt={detail.title[lang]} className="size-full object-cover" /><Button size="icon" variant="secondary" onClick={() => setDetail(null)} aria-label={w.close} className="absolute end-4 top-4 rounded-full"><X /></Button></div><div className="space-y-5 p-6 sm:p-8"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase text-accent-foreground">{detail.city} · {detail.category} · {detail.duration}</p><h2 className="mt-2 font-display text-2xl font-bold sm:text-3xl">{detail.title[lang]}</h2></div><span className="flex items-center gap-1 text-sm font-bold"><Star className="size-4 fill-current text-accent-foreground" />{detail.rating}</span></div><p className="leading-7 text-muted-foreground">{detail.description[lang]}</p><div><h3 className="mb-3 font-bold">{w.highlights}</h3><div className="flex flex-wrap gap-2">{detail.highlights.map(h => <span key={h} className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold">{h}</span>)}</div></div><div className="rounded-2xl bg-secondary p-4 text-sm"><strong>{w.tip}</strong><p className="mt-1 leading-6 text-muted-foreground">{detail.tips[lang]}</p></div><div className="flex flex-wrap gap-3 pt-2"><Button onClick={() => toggle(detail.id)} variant={selectedIds.includes(detail.id) ? "secondary" : "default"} className="rounded-full px-5">{selectedIds.includes(detail.id) ? <Check /> : <Plus />}{selectedIds.includes(detail.id) ? w.added : w.add}</Button>{detail.bookingPath ? <Button asChild variant="outline" className="rounded-full px-5"><Link to={detail.bookingPath}>{w.booked}<ArrowRight /></Link></Button> : <Button variant="outline" className="rounded-full px-5" onClick={() => { if (!selectedIds.includes(detail.id)) toggle(detail.id); openInquiry(); }}>{w.inquire}<ArrowRight /></Button>}</div></div></section></div>}
+    {drawer && <div className="drawer-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setDrawer(false); }}><aside role="dialog" aria-modal="true" aria-label={w.plan} className="drawer-panel"><div className="flex items-center justify-between border-b border-border pb-5"><div><p className="text-xs font-bold uppercase text-accent-foreground">VISIT HIJAZ</p><h2 className="mt-1 font-display text-2xl font-bold">{w.plan}</h2></div><Button variant="ghost" size="icon" onClick={() => setDrawer(false)} aria-label={w.close} className="rounded-full"><X /></Button></div>{selected.length ? <div className="flex-1 space-y-3 overflow-y-auto py-6">{selected.map((d, i) => <div key={d.id} className="flex items-center gap-3 rounded-2xl bg-secondary p-3"><span className="text-xs font-bold text-muted-foreground">{String(i+1).padStart(2,"0")}</span><img src={d.image} alt="" className="size-14 rounded-xl object-cover" /><div className="min-w-0 flex-1"><strong className="block truncate text-sm">{d.title[lang]}</strong><span className="text-xs text-muted-foreground">{d.city} · {d.duration}</span></div><Button size="icon" variant="ghost" aria-label={`${w.remove}: ${d.title[lang]}`} onClick={() => toggle(d.id)} className="shrink-0 rounded-full"><X className="size-4" /></Button></div>)}</div> : <div className="flex flex-1 flex-col items-center justify-center px-8 text-center"><Compass className="mb-5 size-12 text-accent-foreground" /><h3 className="font-display text-xl font-bold">{w.empty}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{w.emptySub}</p></div>}<div className="border-t border-border pt-5"><div className="mb-4 flex items-center justify-between text-sm"><span className="text-muted-foreground">{w.travelers}</span><strong>{travelers}</strong></div>{date && <div className="mb-4 flex items-center justify-between text-sm"><span className="text-muted-foreground">{w.tripDate}</span><strong>{date}</strong></div>}<Button disabled={!selected.length} onClick={openInquiry} className="h-12 w-full rounded-full shadow-clay-button">{w.request}<ArrowRight /></Button></div></aside></div>}
+    {inquiry && <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setInquiry(false); }}><section role="dialog" aria-modal="true" aria-label={w.request} className="modal-panel max-w-lg p-6 sm:p-8"><div className="flex items-start justify-between"><div><p className="text-xs font-bold uppercase text-accent-foreground">{sent ? "03 / 03" : `${String(step).padStart(2,"0")} / 02`}</p><h2 className="mt-2 font-display text-2xl font-bold">{sent ? w.done : step === 1 ? w.formIntro : w.review}</h2></div><Button variant="ghost" size="icon" onClick={() => setInquiry(false)} aria-label={w.close} className="rounded-full"><X /></Button></div>{sent ? <div className="py-8"><Check className="mb-5 size-12 text-accent-foreground" /><p className="leading-7 text-muted-foreground">{w.doneSub}</p><p className="mt-5 text-sm font-semibold">{selected.map(d => d.title[lang]).join(" · ")}</p><Button className="mt-8 rounded-full px-8" onClick={() => setInquiry(false)}>{w.close}</Button></div> : step === 1 ? <form className="mt-7 space-y-4" onSubmit={e => { e.preventDefault(); validate(); }} noValidate>{(["name", "email", "phone"] as const).map(field => <label key={field} className="block text-sm font-semibold">{w[field]}<input value={form[field]} onChange={e => setForm(v => ({ ...v, [field]: e.target.value }))} type={field === "email" ? "email" : field === "phone" ? "tel" : "text"} autoComplete={field === "name" ? "name" : field} aria-invalid={Boolean(errors[field])} className="mt-2 h-12 w-full rounded-xl border border-input bg-background px-4 outline-none focus:ring-2 focus:ring-ring" />{errors[field] && <span role="alert" className="mt-1 block text-xs text-destructive">{errors[field]}</span>}</label>)}<label className="block text-sm font-semibold">{w.notes}<textarea value={form.notes} onChange={e => setForm(v => ({ ...v, notes: e.target.value }))} rows={3} className="mt-2 w-full rounded-xl border border-input bg-background p-4 outline-none focus:ring-2 focus:ring-ring" /></label><Button type="submit" className="h-12 w-full rounded-full">{w.continue}<ArrowRight /></Button></form> : <div className="mt-6 space-y-4 text-sm"><div className="rounded-2xl bg-secondary p-5"><p className="font-bold">{selected.map(d => d.title[lang]).join(" · ")}</p><p className="mt-2 text-muted-foreground">{date || w.date} · {travelers} {w.travelersLabel}</p></div><p><strong>{w.name}:</strong> {form.name}</p><p><strong>{w.email}:</strong> {form.email}</p><p><strong>{w.phone}:</strong> {form.phone}</p>{form.notes && <p><strong>{w.notes}:</strong> {form.notes}</p>}<p className="rounded-xl bg-secondary p-3 text-xs text-muted-foreground">{w.inquiryNote}</p><div className="flex gap-3 pt-3"><Button variant="outline" className="h-12 flex-1 rounded-full" onClick={() => setStep(1)}>{w.back}</Button><Button className="h-12 flex-1 rounded-full" onClick={() => setSent(true)}>{w.submit}<ArrowRight /></Button></div></div>}</section></div>}
+  </main>;
 }
