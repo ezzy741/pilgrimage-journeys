@@ -1,0 +1,3 @@
+- [ ] Rebuild the homepage as a responsive clay-style travel explorer with search, destination cards, details, and an itinerary drawer.
+- [ ] Add a validated inquiry flow and preserve the existing Ziyarat ride booking pages.
+- [ ] Align navigation, theme, language controls, and route metadata; verify desktop and mobile interactions.
