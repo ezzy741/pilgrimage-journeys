@@ -105,7 +105,7 @@ function Index() {
           <ServiceCard to="/offers" image={offersImg} title={t("offers_title")} subtitle={t("offers_sub")} price={combo?.bannerText ?? t("offers_sub")} badge={combo ? `${combo.discountPercentage}% ${t("discount")}` : undefined} />
         </div>
       </section>
-    </div>
+    </main>
   );
 }
 
