@@ -28,8 +28,16 @@ export const Route = createFileRoute("/offers")({
 });
 
 function OffersPage() {
-  const { t } = useI18n();
-  const active = promotions.filter((p) => p.active);
+  const { t, lang } = useI18n();
+  const active = promotions.filter(
+    (p) => p.active && Date.parse(`${p.expiresAt}T23:59:59+03:00`) >= Date.now(),
+  );
+  const comboNote =
+    lang === "ar"
+      ? "العرض المشترك يحتاج عرض سعر منفصل للمدينتين؛ لا يُطبّق تلقائيًا على طلب مدينة واحدة."
+      : lang === "ur"
+        ? "مشترکہ سفر کے لیے دو شہروں کا الگ کوٹیشن درکار ہے؛ یہ کوڈ ایک شہر کی درخواست پر خودکار لاگو نہیں ہوتا۔"
+        : "The combo requires a separate two-city quote; this code is not automatically applied to a single-city request.";
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
@@ -75,9 +83,16 @@ function OffersPage() {
                   Copy
                 </Button>
               </div>
+              {p.targetCard === "combo" && (
+                <p className="text-xs text-muted-foreground">{comboNote}</p>
+              )}
               <Button asChild className="w-full">
                 <Link to={p.targetCard === "madinah" ? "/ziyarat/madinah" : "/ziyarat/makkah"}>
-                  Book now
+                  {lang === "ar"
+                    ? "عرض خيارات الحجز"
+                    : lang === "ur"
+                      ? "بکنگ کے اختیارات دیکھیں"
+                      : "View booking options"}
                 </Link>
               </Button>
             </CardContent>

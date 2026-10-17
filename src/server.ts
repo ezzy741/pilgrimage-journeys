@@ -2,6 +2,10 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { handleBookingApi } from "./bookings.server";
+import { handleCustomerChat } from "./customer-chat.server";
+import { handleDriverApi } from "./drivers.server";
+import { routePortalRequest, withPortalHeaders } from "./portal-routing.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -47,15 +51,26 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const routed = routePortalRequest(request);
+      if (routed) return withPortalHeaders(routed, request);
+      const driverResponse = await handleDriverApi(request);
+      if (driverResponse) return withPortalHeaders(driverResponse, request);
+      const bookingResponse = await handleBookingApi(request);
+      if (bookingResponse) return withPortalHeaders(bookingResponse, request);
+      if (new URL(request.url).pathname === "/api/customer-chat")
+        return handleCustomerChat(request);
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return withPortalHeaders(await normalizeCatastrophicSsrResponse(response), request);
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      return withPortalHeaders(
+        new Response(renderErrorPage(), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+        request,
+      );
     }
   },
 };

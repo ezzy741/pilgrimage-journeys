@@ -30,3 +30,19 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Private runtime configuration and customer records must stay outside Git.
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+**/admin-token
+/shared/
+/verification/
+
+# Python integration-test cache
+__pycache__/
+*.py[cod]
