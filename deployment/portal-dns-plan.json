@@ -1,0 +1,27 @@
+{
+  "state": "not_applied",
+  "zone": "visit-hijaz.com",
+  "prerequisites": [
+    "Authorized activation of staged app and restart of pilgrimage-journeys.service",
+    "Valid TLS certificate covering drivers.visit-hijaz.com and admin.visit-hijaz.com",
+    "Authorized installation, nginx configuration validation and reload of only the new portal vhosts",
+    "Private admin key installed and authenticated access verified"
+  ],
+  "records": [
+    {
+      "type": "A",
+      "name": "drivers.visit-hijaz.com",
+      "content": "140.238.151.59",
+      "proxied": true,
+      "ttl": 1
+    },
+    {
+      "type": "A",
+      "name": "admin.visit-hijaz.com",
+      "content": "140.238.151.59",
+      "proxied": true,
+      "ttl": 1
+    }
+  ],
+  "existingRecordCheck": "Neither exact name existed when inspected. Re-check immediately before any future creation; do not overwrite unrelated records."
+}

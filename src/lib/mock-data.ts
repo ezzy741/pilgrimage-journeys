@@ -45,6 +45,22 @@ export const stops: Record<Zone, ZiyaratStop[]> = {
     { id: "mina", name: "Mina", nameAr: "منى", nameUr: "منیٰ", km: 7 },
     { id: "arafat", name: "Arafat", nameAr: "عرفات", nameUr: "عرفات", km: 20 },
     { id: "muzdalifah", name: "Muzdalifah", nameAr: "مزدلفة", nameUr: "مزدلفہ", km: 12 },
+    // Approximate one-way road distances from Masjid al-Haram, rounded to the nearest kilometre.
+    {
+      id: "hira-district",
+      name: "Hira Cultural District",
+      nameAr: "حي حراء الثقافي",
+      nameUr: "حی حراء الثقافتی",
+      km: 13,
+    },
+    {
+      id: "taneem",
+      name: "Masjid al-Taneem",
+      nameAr: "مسجد التنعيم (مسجد عائشة)",
+      nameUr: "مسجد تنعیم (مسجد عائشہ)",
+      km: 7,
+    },
+    { id: "jinn", name: "Masjid al-Jinn", nameAr: "مسجد الجن", nameUr: "مسجد جن", km: 4 },
   ],
   madinah: [
     { id: "quba", name: "Masjid Quba", nameAr: "مسجد قباء", nameUr: "مسجد قبا", km: 5 },
@@ -57,6 +73,22 @@ export const stops: Record<Zone, ZiyaratStop[]> = {
       km: 7,
     },
     { id: "seven", name: "Seven Mosques", nameAr: "المساجد السبعة", nameUr: "سات مساجد", km: 6 },
+    // Approximate one-way road distances from Masjid an-Nabawi, rounded to the nearest kilometre.
+    { id: "al-fash", name: "Masjid Al-Fash", nameAr: "مسجد الفسح", nameUr: "مسجد الفسح", km: 6 },
+    {
+      id: "dhu-al-hulayfah",
+      name: "Miqat Dhu al-Hulayfah",
+      nameAr: "ميقات ذي الحليفة",
+      nameUr: "میقات ذوالحلیفہ",
+      km: 12,
+    },
+    {
+      id: "omar-mosque",
+      name: "Masjid Omar bin Al-Khattab",
+      nameAr: "مسجد عمر بن الخطاب",
+      nameUr: "مسجد عمر بن خطاب",
+      km: 12,
+    },
   ],
 };
 
