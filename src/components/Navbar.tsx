@@ -26,12 +26,12 @@ export function Navbar() {
           <Link to="/offers" className="rounded-md px-2 py-1.5 hover:bg-secondary">
             {t("nav_offers")}
           </Link>
-          <Link to="/driver" className="rounded-md px-2 py-1.5 hover:bg-secondary">
+          <a
+            href="https://drivers.visit-hijaz.com/drivers/register"
+            className="rounded-md px-2 py-1.5 hover:bg-secondary"
+          >
             {t("nav_driver")}
-          </Link>
-          <Link to="/admin" className="rounded-md px-2 py-1.5 hover:bg-secondary">
-            {t("nav_admin")}
-          </Link>
+          </a>
         </div>
 
         <div className="flex items-center border border-border bg-card p-0.5">
