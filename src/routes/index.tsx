@@ -9,6 +9,8 @@ import {
   Map,
   MapPin,
   Menu,
+  Search,
+  SlidersHorizontal,
   Route as RouteIcon,
   Sparkles,
   X,
@@ -18,7 +20,7 @@ import { MapPicker } from "@/components/MapPicker";
 import { useI18n, type Lang } from "@/lib/i18n";
 import { destinations, type Destination } from "@/lib/destinations";
 import { DEFAULT_ORIGIN_POINTS, type MapEndpoint, type MapPoint } from "@/lib/map-locations";
-import { fareConfigs, stops, type Zone } from "@/lib/mock-data";
+import { calcFare, fareConfigs, stops, type Zone } from "@/lib/mock-data";
 import { readMapDraft, writeMapDraft } from "@/lib/map-draft";
 
 export const Route = createFileRoute("/")({
@@ -160,8 +162,8 @@ const copy: Record<Lang, HomeCopy> = {
     mapFareNotice:
       "Map pins do not calculate a route or fare. Custom points need a manual quote; the booking page explains fare estimates and confirmation.",
     continueBooking: "Continue to booking",
-    driverPending: "Driver sign-up · portal pending deployment",
-    adminStage: "Admin (stage site)",
+    driverPending: "Driver registration · pending approval",
+    adminStage: "Protected administration",
     adminPortal: "Admin portal",
     footerTagline: "Considered journeys, made simple.",
   },
@@ -227,8 +229,8 @@ const copy: Record<Lang, HomeCopy> = {
     mapFareNotice:
       "لا تحسب نقاط الخريطة مسارًا أو أجرة. تتطلب النقاط المخصصة عرض سعر يدويًا؛ وتوضح صفحة الحجز تقدير الأجرة والتأكيد.",
     continueBooking: "المتابعة إلى الحجز",
-    driverPending: "تسجيل السائق · البوابة قيد التجهيز",
-    adminStage: "الإدارة (الموقع التجريبي)",
+    driverPending: "تسجيل السائق · بانتظار الموافقة",
+    adminStage: "الإدارة المحمية",
     adminPortal: "بوابة الإدارة",
     footerTagline: "رحلات مدروسة، ببساطة.",
   },
@@ -290,8 +292,8 @@ const copy: Record<Lang, HomeCopy> = {
     mapFareNotice:
       "نقشے کے پن راستہ یا کرایہ نہیں نکالتے۔ حسبِ ضرورت مقامات کے لیے دستی کوٹیشن درکار ہے؛ بکنگ صفحہ تخمینے اور تصدیق واضح کرتا ہے۔",
     continueBooking: "بکنگ جاری رکھیں",
-    driverPending: "ڈرائیور رجسٹریشن · پورٹل کی تیاری جاری ہے",
-    adminStage: "ایڈمن (اسٹیج سائٹ)",
+    driverPending: "ڈرائیور رجسٹریشن · منظوری درکار",
+    adminStage: "محفوظ انتظامیہ",
     adminPortal: "ایڈمن پورٹل",
     footerTagline: "سوچے سمجھے سفر، آسان انداز میں۔",
   },
@@ -310,6 +312,58 @@ const featuredStopIds: Record<Zone, string[]> = {
   makkah: ["nour", "hira-district", "taneem", "mina", "arafat"],
   madinah: ["quba", "uhud", "qiblatayn", "seven"],
 };
+const stopCopy = {
+  en: {
+    eyebrow: "A closer look",
+    title: "Landmarks along your journey",
+    intro:
+      "Explore every listed ziyarat stop and compare a simple sedan transport estimate from its city origin.",
+    search: "Search a landmark or city",
+    max: "Maximum estimate",
+    allCities: "All cities",
+    ascending: "Lowest estimate first",
+    estimate: "Sedan estimate",
+    origin: "From the city origin",
+    transport: "Transport only · admission not included",
+    noQuote: "Quote unavailable",
+    noResults: "No landmarks match these filters.",
+    baseFare: "Base fare",
+    cityQuote: "Transport quote unavailable",
+  },
+  ar: {
+    eyebrow: "تعرّف عن قرب",
+    title: "معالم على امتداد رحلتك",
+    intro: "استكشف جميع محطات الزيارة المدرجة وقارن تقدير نقل بسيارة سيدان من نقطة بداية المدينة.",
+    search: "ابحث عن معلم أو مدينة",
+    max: "الحد الأقصى للتقدير",
+    allCities: "كل المدن",
+    ascending: "الأقل تقديرًا أولًا",
+    estimate: "تقدير سيارة سيدان",
+    origin: "من نقطة بداية المدينة",
+    transport: "النقل فقط · لا يشمل رسوم الدخول",
+    noQuote: "السعر غير متاح",
+    noResults: "لا توجد معالم تطابق عوامل التصفية.",
+    baseFare: "الأجرة الأساسية",
+    cityQuote: "عرض سعر النقل غير متاح",
+  },
+  ur: {
+    eyebrow: "مزید جانیں",
+    title: "آپ کے سفر کے اہم مقامات",
+    intro:
+      "درج تمام زیارت مقامات دیکھیں اور شہر کے مقررہ نقطۂ آغاز سے سیڈان کے سادہ سفری تخمینے کا موازنہ کریں۔",
+    search: "مقام یا شہر تلاش کریں",
+    max: "زیادہ سے زیادہ تخمینہ",
+    allCities: "تمام شہر",
+    ascending: "کم ترین تخمینہ پہلے",
+    estimate: "سیڈان کا تخمینہ",
+    origin: "شہر کے نقطۂ آغاز سے",
+    transport: "صرف سفر · داخلہ شامل نہیں",
+    noQuote: "کرایہ دستیاب نہیں",
+    noResults: "ان فلٹرز سے کوئی مقام نہیں ملا۔",
+    baseFare: "بنیادی کرایہ",
+    cityQuote: "سفری کرایہ دستیاب نہیں",
+  },
+} as const;
 interface MapDraft {
   zone: Zone;
   departure: MapPoint | null;
@@ -319,7 +373,11 @@ interface MapDraft {
 function Home() {
   const { lang, setLang, dir } = useI18n();
   const text = copy[lang];
+  const stopText = stopCopy[lang];
   const [cityFilter, setCityFilter] = useState<CityName | null>(null);
+  const [stopCityFilter, setStopCityFilter] = useState<CityName | null>(null);
+  const [stopQuery, setStopQuery] = useState("");
+  const [maxEstimate, setMaxEstimate] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mapZone, setMapZone] = useState<Zone>("makkah");
   const [activeField, setActiveField] = useState<MapEndpoint>("departure");
@@ -348,6 +406,34 @@ function Home() {
   const visibleDestinations = destinations.filter(
     (destination) => cityFilter === null || destination.city === cityFilter,
   );
+  const landmarkStops = (Object.entries(stops) as [Zone, (typeof stops)[Zone]][])
+    .flatMap(([zone, cityStops]) =>
+      cityStops.map((stop) => ({
+        ...stop,
+        zone,
+        city: zone === "makkah" ? ("Makkah" as const) : ("Madinah" as const),
+        estimate: calcFare({
+          config: fareConfigs.find((fare) => fare.zone === zone)!,
+          km: stop.km,
+          vehicleMultiplier: 1,
+          surgeOn: false,
+          discountPct: 0,
+        }).total,
+      })),
+    )
+    .filter((stop) => stopCityFilter === null || stop.city === stopCityFilter)
+    .filter((stop) => {
+      const query = stopQuery.trim().toLocaleLowerCase();
+      const name = lang === "ar" ? stop.nameAr : lang === "ur" ? stop.nameUr : stop.name;
+      return (
+        !query ||
+        `${name} ${stop.name} ${stop.nameAr} ${stop.nameUr} ${stop.city} ${text.cityNames[stop.city]}`
+          .toLocaleLowerCase()
+          .includes(query)
+      );
+    })
+    .filter((stop) => maxEstimate === "" || stop.estimate <= Number(maxEstimate))
+    .sort((a, b) => a.estimate - b.estimate);
   const fareFor = (zone: Zone) => fareConfigs.find((fare) => fare.zone === zone)?.baseFare ?? 0;
   const mapCenter = DEFAULT_ORIGIN_POINTS[mapZone];
   const bookingPath = bookingPaths[mapZone];
@@ -455,7 +541,7 @@ function Home() {
                 <Sparkles aria-hidden="true" />
                 {text.eyebrow}
               </p>
-              <h1 id="home-title">{text.headline}</h1>
+              <h1 id="home-title">Visit Hijaz</h1>
               <p className="vh-hero-intro">{text.intro}</p>
               <div className="vh-hero-ctas">
                 <a href="#destinations" className="vh-button vh-button-primary">
@@ -489,6 +575,64 @@ function Home() {
           )}
           <div className="vh-hero-mark" aria-hidden="true">
             <span>VH</span>
+          </div>
+        </section>
+
+        <section id="map" className="vh-map-section" aria-labelledby="map-title">
+          <div className="vh-map-heading">
+            <p className="vh-section-eyebrow">{text.mapEyebrow}</p>
+            <h2 id="map-title">{text.mapTitle}</h2>
+            <p>{text.mapIntro}</p>
+          </div>
+          <div className="vh-map-panel">
+            <div className="vh-map-controls">
+              <div>
+                <p className="vh-map-control-label">{text.navCities}</p>
+                <div className="vh-zone-switch" role="group" aria-label={text.navCities}>
+                  {(["makkah", "madinah"] as const).map((zone) => (
+                    <button
+                      type="button"
+                      key={zone}
+                      aria-pressed={mapZone === zone}
+                      className={mapZone === zone ? "is-active" : ""}
+                      onClick={() => chooseMapCity(zone)}
+                    >
+                      {zone === "makkah" ? text.cityNames.Makkah : text.cityNames.Madinah}
+                    </button>
+                  ))}
+                </div>
+                <p className="vh-map-center">
+                  <MapPin aria-hidden="true" />
+                  {text.mapCenter} {mapOriginLabel} ·{" "}
+                  <span dir="ltr">
+                    {mapCenter.lat.toFixed(4)}, {mapCenter.lng.toFixed(4)}
+                  </span>
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="vh-clear-pins"
+                onClick={() => setMapDraft({ zone: mapZone, departure: null, destination: null })}
+              >
+                {text.clearPins}
+              </Button>
+            </div>
+            <MapPicker
+              zone={mapZone}
+              departure={mapDraft.departure}
+              destination={mapDraft.destination}
+              activeField={activeField}
+              onActiveFieldChange={setActiveField}
+              onPick={setMapPin}
+              onReset={resetMapPin}
+            />
+            <p className="vh-map-note">{text.mapPrivacy}</p>
+            <p className="vh-map-note">{text.mapFareNotice}</p>
+            <Link to={bookingPath} className="vh-button vh-map-continue">
+              {text.continueBooking}
+              <ArrowRight aria-hidden="true" />
+            </Link>
           </div>
         </section>
 
@@ -597,6 +741,18 @@ function Home() {
                       <span className="vh-card-badge">{translatedBadge(destination)}</span>
                     </div>
                     <div className="vh-card-content">
+                      <div className={`vh-city-price ${zone ? "is-priced" : "is-unavailable"}`}>
+                        {zone ? (
+                          <>
+                            <span>{stopText.baseFare}</span>
+                            <strong>
+                              {fareFor(zone)} <small>{text.sar}</small>
+                            </strong>
+                          </>
+                        ) : (
+                          <strong>{stopText.cityQuote}</strong>
+                        )}
+                      </div>
                       <div className="vh-card-meta">
                         <span>{translatedCategory(destination)}</span>
                       </div>
@@ -633,62 +789,110 @@ function Home() {
           )}
         </section>
 
-        <section id="map" className="vh-map-section" aria-labelledby="map-title">
-          <div className="vh-map-heading">
-            <p className="vh-section-eyebrow">{text.mapEyebrow}</p>
-            <h2 id="map-title">{text.mapTitle}</h2>
-            <p>{text.mapIntro}</p>
-          </div>
-          <div className="vh-map-panel">
-            <div className="vh-map-controls">
-              <div>
-                <p className="vh-map-control-label">{text.navCities}</p>
-                <div className="vh-zone-switch" role="group" aria-label={text.navCities}>
-                  {(["makkah", "madinah"] as const).map((zone) => (
-                    <button
-                      type="button"
-                      key={zone}
-                      aria-pressed={mapZone === zone}
-                      className={mapZone === zone ? "is-active" : ""}
-                      onClick={() => chooseMapCity(zone)}
-                    >
-                      {zone === "makkah" ? text.cityNames.Makkah : text.cityNames.Madinah}
-                    </button>
-                  ))}
-                </div>
-                <p className="vh-map-center">
-                  <MapPin aria-hidden="true" />
-                  {text.mapCenter} {mapOriginLabel} ·{" "}
-                  <span dir="ltr">
-                    {mapCenter.lat.toFixed(4)}, {mapCenter.lng.toFixed(4)}
-                  </span>
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="vh-clear-pins"
-                onClick={() => setMapDraft({ zone: mapZone, departure: null, destination: null })}
-              >
-                {text.clearPins}
-              </Button>
+        <section className="vh-landmarks" aria-labelledby="landmarks-title">
+          <div className="vh-section-heading">
+            <div>
+              <p className="vh-section-eyebrow">{stopText.eyebrow}</p>
+              <h2 id="landmarks-title">{stopText.title}</h2>
+              <p className="vh-section-intro">{stopText.intro}</p>
             </div>
-            <MapPicker
-              zone={mapZone}
-              departure={mapDraft.departure}
-              destination={mapDraft.destination}
-              activeField={activeField}
-              onActiveFieldChange={setActiveField}
-              onPick={setMapPin}
-              onReset={resetMapPin}
-            />
-            <p className="vh-map-note">{text.mapPrivacy}</p>
-            <p className="vh-map-note">{text.mapFareNotice}</p>
-            <Link to={bookingPath} className="vh-button vh-map-continue">
-              {text.continueBooking}
-              <ArrowRight aria-hidden="true" />
-            </Link>
+            <span className="vh-heading-icon" aria-hidden="true">
+              <MapPin />
+            </span>
           </div>
+          <div className="vh-landmark-tools">
+            <label className="vh-landmark-search">
+              <Search aria-hidden="true" />
+              <span className="sr-only">{stopText.search}</span>
+              <input
+                type="search"
+                value={stopQuery}
+                placeholder={stopText.search}
+                onChange={(event) => setStopQuery(event.target.value)}
+              />
+            </label>
+            <label className="vh-landmark-max">
+              <SlidersHorizontal aria-hidden="true" />
+              <span>{stopText.max}</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                inputMode="numeric"
+                value={maxEstimate}
+                placeholder="—"
+                onChange={(event) => setMaxEstimate(event.target.value)}
+                aria-label={stopText.max}
+              />
+              <small>{text.sar}</small>
+            </label>
+          </div>
+          <div
+            className="vh-city-filters vh-landmark-filters"
+            role="group"
+            aria-label={stopText.allCities}
+          >
+            <button
+              type="button"
+              className={stopCityFilter === null ? "is-active" : ""}
+              aria-pressed={stopCityFilter === null}
+              onClick={() => setStopCityFilter(null)}
+            >
+              {stopText.allCities}
+            </button>
+            {(["Makkah", "Madinah"] as const).map((city) => (
+              <button
+                key={city}
+                type="button"
+                className={stopCityFilter === city ? "is-active" : ""}
+                aria-pressed={stopCityFilter === city}
+                onClick={() => setStopCityFilter(city)}
+              >
+                {translatedCity(city)}
+              </button>
+            ))}
+            <span className="vh-sort-label">{stopText.ascending}</span>
+          </div>
+          {landmarkStops.length ? (
+            <div className="vh-landmark-grid">
+              {landmarkStops.map((stop, index) => {
+                const name = lang === "ar" ? stop.nameAr : lang === "ur" ? stop.nameUr : stop.name;
+                return (
+                  <a
+                    key={stop.id}
+                    className="vh-landmark-card"
+                    href={`${bookingPaths[stop.zone]}?stop=${encodeURIComponent(stop.id)}`}
+                    aria-label={`${name}, ${translatedCity(stop.city)}, ${stopText.estimate}: ${stop.estimate} ${text.sar}`}
+                  >
+                    <span className="vh-landmark-icon">
+                      <Landmark aria-hidden="true" />
+                    </span>
+                    <span className="vh-landmark-main">
+                      <small>
+                        {translatedCity(stop.city)} · {stopText.origin}:{" "}
+                        {stop.zone === "makkah" ? text.mapOriginMakkah : text.mapOriginMadinah}
+                      </small>
+                      <strong>{name}</strong>
+                      <span>{stopText.transport}</span>
+                    </span>
+                    <span className="vh-landmark-price">
+                      <small>{stopText.estimate}</small>
+                      <strong>
+                        {stop.estimate} <small>{text.sar}</small>
+                      </strong>
+                    </span>
+                    <span className="vh-landmark-index" aria-hidden="true">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                  </a>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="vh-empty-results" role="status">
+              {stopText.noResults}
+            </p>
+          )}
         </section>
 
         <footer className="vh-footer">

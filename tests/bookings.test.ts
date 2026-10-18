@@ -68,6 +68,34 @@ async function post(
   );
 }
 
+async function track(
+  id: unknown,
+  trackingToken?: unknown,
+  extra: Record<string, string> = {},
+): Promise<Response | null> {
+  return handleBookingApi(
+    new Request("http://localhost/api/bookings/track", {
+      method: "POST",
+      headers: { ...originHeaders({ "content-type": "application/json" }), ...extra },
+      body: JSON.stringify({ id, ...(trackingToken === undefined ? {} : { trackingToken }) }),
+    }),
+  );
+}
+
+async function adminPatch(id: string, patch: Record<string, unknown>): Promise<Response | null> {
+  return handleBookingApi(
+    new Request(`http://localhost/api/admin/bookings/${id}`, {
+      method: "PATCH",
+      headers: {
+        authorization: `Bearer ${token}`,
+        origin: "https://visit-hijaz.com",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(patch),
+    }),
+  );
+}
+
 async function adminGet(headers: Record<string, string> = {}): Promise<Response | null> {
   return handleBookingApi(
     new Request("http://localhost/api/admin/bookings", {
@@ -244,6 +272,167 @@ test("token-file authentication accepts only a private sufficiently long token",
 test("routes outside the API are left untouched", async () => {
   freshDirectory();
   assert.equal(await handleBookingApi(new Request("http://localhost/other")), null);
+});
+
+test("tracking capability is returned on creation and idempotent retry, but only hashed outside the receipt", async () => {
+  const directory = freshDirectory();
+  const payload = validPayload();
+  const created = await post(payload);
+  assert.equal(created?.status, 201);
+  const receipt = (await created!.json()) as {
+    id: string;
+    trackingToken: string;
+    reference: string;
+  };
+  assert.ok(receipt.trackingToken.length >= 32);
+  const replay = await post(payload);
+  assert.equal(replay?.status, 200);
+  assert.equal(
+    ((await replay!.json()) as { trackingToken: string }).trackingToken,
+    receipt.trackingToken,
+  );
+
+  assert.equal((await track(receipt.id))?.status, 404);
+  assert.equal((await track(receipt.id, "wrong-tracking-capability-1234567890"))?.status, 404);
+  assert.equal(
+    (await track("00000000-0000-4000-8000-000000000000", receipt.trackingToken))?.status,
+    404,
+  );
+  const statusResponse = await track(receipt.id, receipt.trackingToken);
+  assert.equal(statusResponse?.status, 200);
+  const status = (await statusResponse!.json()) as Record<string, unknown>;
+  assert.deepEqual(Object.keys(status).sort(), [
+    "driverDisplayName",
+    "reference",
+    "status",
+    "updatedAt",
+    "vehicleModel",
+    "vehiclePlate",
+  ]);
+  assert.equal(status.reference, receipt.reference);
+  assert.equal(status.status, "pending_review");
+  for (const field of [
+    "customerName",
+    "phone",
+    "pickupText",
+    "departure",
+    "destination",
+    "pickupAt",
+    "notes",
+    "token",
+    "trackingToken",
+    "estimatedFare",
+    "adminToken",
+  ])
+    assert.equal(field in status, false, `tracking response leaked ${field}`);
+
+  const admin = await adminGet();
+  const booking = ((await admin!.json()) as { bookings: Array<Record<string, unknown>> })
+    .bookings[0]!;
+  assert.equal("trackingToken" in booking, false);
+  assert.equal("token_hash" in booking, false);
+  const db = (await import("node:sqlite")).DatabaseSync;
+  const privateDb = new db(join(directory, "bookings.sqlite"), { readOnly: true });
+  const stored = privateDb
+    .prepare("SELECT token_hash FROM booking_tracking_tokens WHERE booking_id = ?")
+    .get(receipt.id) as { token_hash: string };
+  assert.notEqual(stored.token_hash, receipt.trackingToken);
+  assert.equal(stored.token_hash.length, 64);
+  privateDb.close();
+});
+
+test("trip status transitions require assignment and customer tracking exposes only staff-entered safe details", async () => {
+  freshDirectory();
+  const created = await post(validPayload());
+  const receipt = (await created!.json()) as { id: string; trackingToken: string };
+  assert.equal((await adminPatch(receipt.id, { tripStatus: "driver_assigned" }))?.status, 409);
+  assert.equal((await adminPatch(receipt.id, { tripStatus: "confirmed" }))?.status, 200);
+  assert.equal((await adminPatch(receipt.id, { tripStatus: "en_route" }))?.status, 409);
+  assert.equal((await adminPatch(receipt.id, { tripStatus: "driver_assigned" }))?.status, 422);
+  const assigned = await adminPatch(receipt.id, {
+    tripStatus: "driver_assigned",
+    driverDisplayName: "Samir",
+    vehiclePlate: "ABC 123",
+    vehicleModel: "Toyota Camry",
+  });
+  assert.equal(assigned?.status, 200);
+  assert.equal((await adminPatch(receipt.id, { tripStatus: "arrived" }))?.status, 409);
+  assert.equal((await adminPatch(receipt.id, { tripStatus: "en_route" }))?.status, 200);
+  assert.equal((await adminPatch(receipt.id, { tripStatus: "arrived" }))?.status, 200);
+  const tracked = await track(receipt.id, receipt.trackingToken);
+  const customer = (await tracked!.json()) as Record<string, unknown>;
+  assert.equal(customer.status, "arrived");
+  assert.equal(customer.driverDisplayName, "Samir");
+  assert.equal(customer.vehiclePlate, "ABC 123");
+  assert.equal(customer.vehicleModel, "Toyota Camry");
+  assert.equal("phone" in customer, false);
+  assert.equal((await adminPatch(receipt.id, { tripStatus: "pending_review" }))?.status, 409);
+  assert.equal((await adminPatch(receipt.id, { tripStatus: "cancelled" }))?.status, 200);
+  assert.equal((await adminPatch(receipt.id, { tripStatus: "confirmed" }))?.status, 409);
+});
+
+test("legacy booking rows migrate with a safe initial trip status and map edits still require a manual quote", async () => {
+  const directory = freshDirectory();
+  const { DatabaseSync } = await import("node:sqlite");
+  const legacyDb = new DatabaseSync(join(directory, "bookings.sqlite"));
+  legacyDb.exec(
+    `CREATE TABLE bookings (id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE, payload_hash TEXT NOT NULL, created_at TEXT NOT NULL, booking_json TEXT NOT NULL, fare_snapshot_json TEXT);`,
+  );
+  const now = new Date().toISOString();
+  const oldBooking = {
+    id: "c5b5af99-29f6-4a40-9a01-51b59ec7c6e0",
+    reference: "VH-LEGACY01",
+    createdAt: now,
+    updatedAt: now,
+    consentAt: now,
+    customerName: "Old Receipt Customer",
+    phone: "+966551234567",
+    zone: "makkah",
+    vehicle: "sedan",
+    stopIds: ["nour"],
+    pickupText: "",
+    departure: null,
+    destination: null,
+    pickupAt: now,
+    notes: "",
+    promoCode: "",
+    consent: true,
+    status: "pending_review",
+    estimatedFare: 99,
+    currency: "SAR",
+  };
+  legacyDb
+    .prepare("INSERT INTO bookings VALUES (?, ?, ?, ?, ?, ?)")
+    .run(
+      oldBooking.id,
+      "c5b5af99-29f6-4a40-9a01-51b59ec7c6e0",
+      "old-hash",
+      now,
+      JSON.stringify(oldBooking),
+      "{}",
+    );
+  legacyDb.close();
+  const legacyList = await adminGet();
+  assert.equal(legacyList?.status, 200);
+  const migrated = ((await legacyList!.json()) as { bookings: Array<Record<string, unknown>> })
+    .bookings[0]!;
+  assert.equal(migrated.reference, "VH-LEGACY01");
+  assert.equal(migrated.tripStatus, "pending_review");
+  assert.equal(migrated.driverDisplayName, null);
+
+  const created = await post(
+    validPayload({ idempotencyKey: "85c2d1b2-036d-49c5-8eb5-c1dd96290dc2" }),
+  );
+  const receipt = (await created!.json()) as { id: string; estimatedFare: number };
+  const edited = await adminPatch(receipt.id, {
+    departure: { lat: 21.43, lng: 39.83 },
+    pickupText: "Hotel entrance",
+  });
+  assert.equal(edited?.status, 200);
+  const updated = ((await edited!.json()) as { booking: Record<string, unknown> }).booking;
+  assert.equal(updated.status, "quote_requested");
+  assert.equal(updated.tripStatus, "quote_requested");
+  assert.equal(updated.estimatedFare, null);
 });
 
 test.after(() => restoreEnvironment());

@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { chmodSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { isIP } from "node:net";
 import { join, resolve } from "node:path";
@@ -11,6 +11,7 @@ import type {
   BookingZone,
   BookingVehicle,
   StoredBooking,
+  TripStatus,
 } from "./lib/booking-types.ts";
 import { DEFAULT_ORIGIN_POINTS } from "./lib/map-locations.ts";
 
@@ -98,7 +99,19 @@ function getDatabase(dataDir: string): DatabaseSync {
       fare_snapshot_json TEXT
     );
     CREATE INDEX IF NOT EXISTS bookings_created_at_idx ON bookings(created_at DESC);
+    CREATE TABLE IF NOT EXISTS booking_tracking_tokens (
+      booking_id TEXT PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS booking_service_secrets (
+      name TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
+  // Migrate old flat booking JSON on read; token hashes remain isolated from admin records.
+  db.prepare(
+    "INSERT OR IGNORE INTO booking_service_secrets (name, value) VALUES ('tracking_hmac_key', ?)",
+  ).run(randomBytes(32).toString("hex"));
   // SQLite creates WAL/SHM files beside the database. Restrict them after opening too.
   for (const sidecar of [`${dbPath}-wal`, `${dbPath}-shm`]) {
     try {
@@ -431,6 +444,57 @@ function canonicalHash(input: BookingInput): string {
   return createHash("sha256").update(canonical).digest("hex");
 }
 
+const TRIP_STATUSES: readonly TripStatus[] = [
+  "pending_review",
+  "quote_requested",
+  "confirmed",
+  "driver_assigned",
+  "en_route",
+  "arrived",
+  "in_progress",
+  "completed",
+  "cancelled",
+];
+const NEXT_TRIP_STATUS: Partial<Record<TripStatus, TripStatus>> = {
+  pending_review: "confirmed",
+  quote_requested: "confirmed",
+  confirmed: "driver_assigned",
+  driver_assigned: "en_route",
+  en_route: "arrived",
+  arrived: "in_progress",
+  in_progress: "completed",
+};
+
+function normalizeBooking(booking: StoredBooking): StoredBooking {
+  const legacy = booking as StoredBooking &
+    Partial<
+      Pick<StoredBooking, "tripStatus" | "driverDisplayName" | "vehiclePlate" | "vehicleModel">
+    >;
+  return {
+    ...booking,
+    tripStatus:
+      legacy.tripStatus && TRIP_STATUSES.includes(legacy.tripStatus)
+        ? legacy.tripStatus
+        : booking.status,
+    driverDisplayName: legacy.driverDisplayName ?? null,
+    vehiclePlate: legacy.vehiclePlate ?? null,
+    vehicleModel: legacy.vehicleModel ?? null,
+  };
+}
+
+function capabilityFor(db: DatabaseSync, bookingId: string): string {
+  const secret = db
+    .prepare("SELECT value FROM booking_service_secrets WHERE name = 'tracking_hmac_key'")
+    .get() as { value: string };
+  return createHmac("sha256", Buffer.from(secret.value, "hex"))
+    .update(bookingId)
+    .digest("base64url");
+}
+
+function trackingHash(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
 function receipt(booking: StoredBooking): BookingReceipt {
   return {
     id: booking.id,
@@ -444,7 +508,7 @@ function receipt(booking: StoredBooking): BookingReceipt {
 function createBooking(
   db: DatabaseSync,
   input: BookingInput,
-): { booking: StoredBooking; duplicate: boolean } {
+): { booking: StoredBooking; duplicate: boolean; trackingToken: string } {
   const hash = canonicalHash(input);
   db.exec("BEGIN IMMEDIATE");
   try {
@@ -454,8 +518,13 @@ function createBooking(
     if (existing) {
       if (existing.payload_hash !== hash)
         fail(409, "Idempotency key was already used with a different request.");
+      const existingBooking = normalizeBooking(JSON.parse(existing.booking_json) as StoredBooking);
+      const trackingToken = capabilityFor(db, existingBooking.id);
+      db.prepare(
+        "INSERT OR IGNORE INTO booking_tracking_tokens (booking_id, token_hash) VALUES (?, ?)",
+      ).run(existingBooking.id, trackingHash(trackingToken));
       db.exec("COMMIT");
-      return { booking: JSON.parse(existing.booking_json) as StoredBooking, duplicate: true };
+      return { booking: existingBooking, duplicate: true, trackingToken };
     }
     const fare = fareFor(input);
     const now = new Date().toISOString();
@@ -480,7 +549,12 @@ function createBooking(
       status: fare.status,
       estimatedFare: fare.estimatedFare,
       currency: "SAR",
+      tripStatus: fare.status,
+      driverDisplayName: null,
+      vehiclePlate: null,
+      vehicleModel: null,
     };
+    const trackingToken = capabilityFor(db, booking.id);
     db.prepare(
       `INSERT INTO bookings (id, idempotency_key, payload_hash, created_at, booking_json, fare_snapshot_json)
       VALUES (?, ?, ?, ?, ?, ?)`,
@@ -492,8 +566,12 @@ function createBooking(
       JSON.stringify(booking),
       fare.fareSnapshot,
     );
+    db.prepare("INSERT INTO booking_tracking_tokens (booking_id, token_hash) VALUES (?, ?)").run(
+      booking.id,
+      trackingHash(trackingToken),
+    );
     db.exec("COMMIT");
-    return { booking, duplicate: false };
+    return { booking, duplicate: false, trackingToken };
   } catch (error) {
     try {
       db.exec("ROLLBACK");
@@ -505,13 +583,19 @@ function createBooking(
 }
 
 function patchBooking(db: DatabaseSync, id: string, patch: Record<string, unknown>): StoredBooking {
-  const allowed = ["departure", "destination", "pickupText"] as const;
+  const routeFields = ["departure", "destination", "pickupText"] as const;
+  const tripFields = ["tripStatus", "driverDisplayName", "vehiclePlate", "vehicleModel"] as const;
+  const allowed = [...routeFields, ...tripFields];
   rejectUnknownKeys(patch, allowed);
   if (Object.keys(patch).length === 0) fail(400, "At least one supported field is required.");
   const existingRow = db.prepare("SELECT booking_json FROM bookings WHERE id = ?").get(id) as
     { booking_json: string } | undefined;
   if (!existingRow) fail(404, "Booking not found.");
-  const booking = JSON.parse(existingRow.booking_json) as StoredBooking;
+  const booking = normalizeBooking(JSON.parse(existingRow.booking_json) as StoredBooking);
+  const hasRouteChange = routeFields.some((field) => field in patch);
+  const hasTripChange = tripFields.some((field) => field in patch);
+  if (hasRouteChange && !["pending_review", "quote_requested"].includes(booking.tripStatus))
+    fail(409, "Route details cannot be changed after a trip is confirmed.");
   if ("departure" in patch) booking.departure = validatePoint(patch["departure"]);
   if ("destination" in patch) booking.destination = validatePoint(patch["destination"]);
   if ("pickupText" in patch) {
@@ -519,16 +603,57 @@ function patchBooking(db: DatabaseSync, id: string, patch: Record<string, unknow
       fail(422, "Pickup text must be at most 120 characters.");
     booking.pickupText = patch["pickupText"].trim();
   }
+  if (hasRouteChange) {
+    booking.estimatedFare = null;
+    booking.status = "quote_requested";
+    booking.tripStatus = "quote_requested";
+  }
+  if (hasTripChange) {
+    for (const field of ["driverDisplayName", "vehiclePlate", "vehicleModel"] as const) {
+      if (!(field in patch)) continue;
+      const value = patch[field];
+      if (
+        value !== null &&
+        (typeof value !== "string" || value.trim().length > (field === "vehiclePlate" ? 24 : 80))
+      )
+        fail(422, "Driver and vehicle details are invalid.");
+      booking[field] = typeof value === "string" ? value.trim() || null : null;
+    }
+    if ("tripStatus" in patch) {
+      const next = patch["tripStatus"];
+      if (typeof next !== "string" || !TRIP_STATUSES.includes(next as TripStatus))
+        fail(422, "Trip status is invalid.");
+      const target = next as TripStatus;
+      const current = booking.tripStatus;
+      const valid =
+        target === current ||
+        (target === "cancelled" && current !== "completed" && current !== "cancelled") ||
+        NEXT_TRIP_STATUS[current] === target;
+      if (!valid) fail(409, "Trip status transition is not allowed.");
+      if (target === "driver_assigned" && (!booking.driverDisplayName || !booking.vehiclePlate))
+        fail(422, "Assign a driver name and vehicle plate before marking the driver assigned.");
+      booking.tripStatus = target;
+    }
+    if (
+      booking.tripStatus === "driver_assigned" &&
+      (!booking.driverDisplayName || !booking.vehiclePlate)
+    )
+      fail(422, "A driver name and vehicle plate are required for this trip status.");
+  }
   booking.updatedAt = new Date().toISOString();
-  booking.estimatedFare = null;
-  booking.status = "quote_requested";
-  booking.currency = "SAR";
+  const fareSnapshot = hasRouteChange ? null : undefined;
   db.exec("BEGIN IMMEDIATE");
   try {
-    db.prepare("UPDATE bookings SET booking_json = ?, fare_snapshot_json = NULL WHERE id = ?").run(
-      JSON.stringify(booking),
-      id,
-    );
+    if (fareSnapshot === null) {
+      db.prepare(
+        "UPDATE bookings SET booking_json = ?, fare_snapshot_json = NULL WHERE id = ?",
+      ).run(JSON.stringify(booking), id);
+    } else {
+      db.prepare("UPDATE bookings SET booking_json = ? WHERE id = ?").run(
+        JSON.stringify(booking),
+        id,
+      );
+    }
     db.exec("COMMIT");
   } catch (error) {
     try {
@@ -541,13 +666,45 @@ function patchBooking(db: DatabaseSync, id: string, patch: Record<string, unknow
   return booking;
 }
 
+function trackBooking(db: DatabaseSync, idValue: unknown, token: unknown): Record<string, unknown> {
+  if (
+    typeof idValue !== "string" ||
+    !UUID_PATTERN.test(idValue) ||
+    typeof token !== "string" ||
+    token.length < 32 ||
+    token.length > 128
+  )
+    fail(404, "Tracking information was not found.");
+  const row = db
+    .prepare(
+      `SELECT b.booking_json, t.token_hash FROM bookings b
+    JOIN booking_tracking_tokens t ON t.booking_id = b.id WHERE b.id = ?`,
+    )
+    .get(idValue) as { booking_json: string; token_hash: string } | undefined;
+  if (!row) fail(404, "Tracking information was not found.");
+  const actual = Buffer.from(trackingHash(token), "hex");
+  const expected = Buffer.from(row.token_hash, "hex");
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected))
+    fail(404, "Tracking information was not found.");
+  const booking = normalizeBooking(JSON.parse(row.booking_json) as StoredBooking);
+  return {
+    reference: booking.reference,
+    status: booking.tripStatus,
+    updatedAt: booking.updatedAt,
+    driverDisplayName: booking.driverDisplayName,
+    vehiclePlate: booking.vehiclePlate,
+    vehicleModel: booking.vehicleModel,
+  };
+}
+
 async function route(request: Request, pathname: string): Promise<Response | null> {
   const isCreate = pathname === "/api/bookings";
+  const isTrack = pathname === "/api/bookings/track";
   const isAdminList = pathname === "/api/admin/bookings";
   const patchMatch = /^\/api\/admin\/bookings\/([^/]+)$/.exec(pathname);
-  if (!isCreate && !isAdminList && !patchMatch) return null;
+  if (!isCreate && !isTrack && !isAdminList && !patchMatch) return null;
   if (
-    (isCreate && request.method !== "POST") ||
+    ((isCreate || isTrack) && request.method !== "POST") ||
     (isAdminList && request.method !== "GET") ||
     (patchMatch && request.method !== "PATCH")
   ) {
@@ -558,13 +715,25 @@ async function route(request: Request, pathname: string): Promise<Response | nul
   const token = getAdminToken(dataDir);
   if (!token) return response(503, { error: "Booking service is not configured." });
 
-  if (isCreate) {
+  if (isCreate || isTrack) {
     if (!validOrigin(request)) return response(403, { error: "Request origin is not allowed." });
     enforceRateLimit(request);
-    const input = parseBooking(await readJson(request));
+    const body = await readJson(request);
     const db = getDatabase(dataDir);
+    if (isTrack) {
+      if (!isRecord(body)) fail(400, "Request body must be a JSON object.");
+      rejectUnknownKeys(body, ["id", "trackingToken"]);
+      const bearer = request.headers.get("authorization") ?? "";
+      const headerToken = /^Bearer ([^\s]+)$/i.exec(bearer)?.[1];
+      const safeStatus = trackBooking(db, body["id"], headerToken ?? body["trackingToken"]);
+      return response(200, safeStatus);
+    }
+    const input = parseBooking(body);
     const result = createBooking(db, input);
-    return response(result.duplicate ? 200 : 201, receipt(result.booking));
+    return response(result.duplicate ? 200 : 201, {
+      ...receipt(result.booking),
+      trackingToken: result.trackingToken,
+    });
   }
 
   if (!authorized(request, token))
@@ -575,7 +744,7 @@ async function route(request: Request, pathname: string): Promise<Response | nul
       .prepare("SELECT booking_json FROM bookings ORDER BY created_at DESC, id DESC LIMIT 100")
       .all() as Array<{ booking_json: string }>;
     return response(200, {
-      bookings: rows.map((row) => JSON.parse(row.booking_json) as StoredBooking),
+      bookings: rows.map((row) => normalizeBooking(JSON.parse(row.booking_json) as StoredBooking)),
     });
   }
   if (!validOrigin(request)) return response(403, { error: "Request origin is not allowed." });

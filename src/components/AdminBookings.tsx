@@ -8,10 +8,30 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MapPicker } from "@/components/MapPicker";
 import type { MapEndpoint, MapPoint } from "@/lib/map-locations";
-import type { StoredBooking } from "@/lib/booking-types";
+import type { StoredBooking, TripStatus } from "@/lib/booking-types";
 import { stops } from "@/lib/mock-data";
 
 const BOOKINGS_URL = "/api/admin/bookings";
+const TRIP_NEXT: Partial<Record<TripStatus, TripStatus>> = {
+  pending_review: "confirmed",
+  quote_requested: "confirmed",
+  confirmed: "driver_assigned",
+  driver_assigned: "en_route",
+  en_route: "arrived",
+  arrived: "in_progress",
+  in_progress: "completed",
+};
+const TRIP_LABELS: Record<TripStatus, string> = {
+  pending_review: "Pending review",
+  quote_requested: "Quote requested",
+  confirmed: "Confirmed",
+  driver_assigned: "Driver assigned",
+  en_route: "En route",
+  arrived: "Arrived",
+  in_progress: "In progress",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
 
 type BookingDraft = Pick<StoredBooking, "departure" | "destination" | "pickupText">;
 
@@ -47,6 +67,10 @@ export function AdminBookings() {
   const [invalidatedBookingIds, setInvalidatedBookingIds] = useState<Set<string>>(() => new Set());
   const [selectedId, setSelectedId] = useState("");
   const [draft, setDraft] = useState<BookingDraft | null>(null);
+  const [tripStatusDraft, setTripStatusDraft] = useState<TripStatus>("pending_review");
+  const [driverNameDraft, setDriverNameDraft] = useState("");
+  const [vehiclePlateDraft, setVehiclePlateDraft] = useState("");
+  const [vehicleModelDraft, setVehicleModelDraft] = useState("");
   const [activeField, setActiveField] = useState<MapEndpoint>("departure");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -87,6 +111,10 @@ export function AdminBookings() {
     setInvalidatedBookingIds(new Set());
     setSelectedId("");
     setDraft(null);
+    setTripStatusDraft("pending_review");
+    setDriverNameDraft("");
+    setVehiclePlateDraft("");
+    setVehicleModelDraft("");
   };
 
   const lock = () => {
@@ -165,6 +193,10 @@ export function AdminBookings() {
   const selectBooking = (booking: StoredBooking) => {
     setSelectedId(booking.id);
     setDraft(makeDraft(booking));
+    setTripStatusDraft(booking.tripStatus);
+    setDriverNameDraft(booking.driverDisplayName ?? "");
+    setVehiclePlateDraft(booking.vehiclePlate ?? "");
+    setVehicleModelDraft(booking.vehicleModel ?? "");
     setActiveField("departure");
     setError("");
     setNotice("");
@@ -228,6 +260,56 @@ export function AdminBookings() {
         setBusy(false);
         requestController.current = null;
       }
+    }
+  };
+
+  const saveTripUpdate = async () => {
+    if (!selected || !adminKey || busy) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch(`${BOOKINGS_URL}/${encodeURIComponent(selected.id)}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${adminKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tripStatus: tripStatusDraft,
+          driverDisplayName: driverNameDraft.trim() || null,
+          vehiclePlate: vehiclePlateDraft.trim() || null,
+          vehicleModel: vehicleModelDraft.trim() || null,
+        }),
+        credentials: "omit",
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        setError(
+          response.status === 401 || response.status === 403 || response.status === 503
+            ? friendlyError(response.status)
+            : "That trip status change is not allowed, or assignment details are incomplete.",
+        );
+        if ([401, 403, 503].includes(response.status)) clearPrivateData();
+        return;
+      }
+      const payload = (await response.json()) as { booking?: StoredBooking };
+      const updated = payload.booking;
+      if (!updated || updated.id !== selected.id) {
+        setError("The booking service returned an unexpected response.");
+        return;
+      }
+      setBookings((current) =>
+        current.map((booking) => (booking.id === updated.id ? updated : booking)),
+      );
+      setTripStatusDraft(updated.tripStatus);
+      setDriverNameDraft(updated.driverDisplayName ?? "");
+      setVehiclePlateDraft(updated.vehiclePlate ?? "");
+      setVehicleModelDraft(updated.vehicleModel ?? "");
+      setNotice(
+        "Trip status and staff-entered driver/vehicle details saved. No GPS or ETA is being reported.",
+      );
+    } catch {
+      setError(friendlyError());
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -382,6 +464,85 @@ export function AdminBookings() {
                         Recorded estimate: {selected.estimatedFare} SAR · not a confirmed fare
                       </p>
                     )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Ride status and assignment</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    These are staff-entered status updates only. Driver GPS and arrival estimates
+                    are not available.
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="trip-status">Trip status</Label>
+                      <select
+                        id="trip-status"
+                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        value={tripStatusDraft}
+                        onChange={(event) => setTripStatusDraft(event.target.value as TripStatus)}
+                        disabled={busy}
+                      >
+                        {[
+                          ...new Set([
+                            selected.tripStatus,
+                            ...(TRIP_NEXT[selected.tripStatus]
+                              ? [TRIP_NEXT[selected.tripStatus]!]
+                              : []),
+                            ...(selected.tripStatus !== "completed" &&
+                            selected.tripStatus !== "cancelled"
+                              ? ["cancelled" as const]
+                              : []),
+                          ]),
+                        ].map((status) => (
+                          <option key={status} value={status}>
+                            {TRIP_LABELS[status]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="driver-name">Driver display name</Label>
+                      <Input
+                        id="driver-name"
+                        value={driverNameDraft}
+                        onChange={(event) => setDriverNameDraft(event.target.value)}
+                        maxLength={80}
+                        disabled={busy}
+                        placeholder="Staff-entered name"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="vehicle-plate">Vehicle plate</Label>
+                      <Input
+                        id="vehicle-plate"
+                        value={vehiclePlateDraft}
+                        onChange={(event) => setVehiclePlateDraft(event.target.value)}
+                        maxLength={24}
+                        disabled={busy}
+                        placeholder="Plate number"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="vehicle-model">Vehicle model (optional)</Label>
+                      <Input
+                        id="vehicle-model"
+                        value={vehicleModelDraft}
+                        onChange={(event) => setVehicleModelDraft(event.target.value)}
+                        maxLength={80}
+                        disabled={busy}
+                        placeholder="Make / model"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button type="button" onClick={() => void saveTripUpdate()} disabled={busy}>
+                      <Save className="me-2 size-4" /> {busy ? "Saving…" : "Save trip update"}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

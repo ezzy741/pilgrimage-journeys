@@ -1,6 +1,25 @@
 export type BookingZone = "makkah" | "madinah";
 export type BookingVehicle = "sedan" | "suv" | "hiace";
 export type BookingStatus = "pending_review" | "quote_requested";
+export type TripStatus =
+  | "pending_review"
+  | "quote_requested"
+  | "confirmed"
+  | "driver_assigned"
+  | "en_route"
+  | "arrived"
+  | "in_progress"
+  | "completed"
+  | "cancelled";
+
+export interface BookingTrackingStatus {
+  reference: string;
+  status: TripStatus;
+  updatedAt: string;
+  driverDisplayName: string | null;
+  vehiclePlate: string | null;
+  vehicleModel: string | null;
+}
 
 export interface BookingPoint {
   lat: number;
@@ -41,6 +60,10 @@ export interface StoredBooking extends Omit<BookingInput, "idempotencyKey"> {
   status: BookingStatus;
   estimatedFare: number | null;
   currency: "SAR";
+  tripStatus: TripStatus;
+  driverDisplayName: string | null;
+  vehiclePlate: string | null;
+  vehicleModel: string | null;
 }
 
 export interface BookingReceipt {
@@ -49,4 +72,5 @@ export interface BookingReceipt {
   status: BookingStatus;
   estimatedFare: number | null;
   currency: "SAR";
+  trackingToken?: string;
 }

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { MapPicker } from "@/components/MapPicker";
+import { BookingTracking } from "@/components/BookingTracking";
 import { useI18n } from "@/lib/i18n";
 import { DEFAULT_ORIGIN_POINTS, type MapEndpoint, type MapPoint } from "@/lib/map-locations";
 import type { BookingReceipt } from "@/lib/booking-types";
@@ -21,11 +22,19 @@ import {
   type Zone,
 } from "@/lib/mock-data";
 
-export function ZiyaratBooking({ zone }: { zone: Zone }) {
+export function ZiyaratBooking({
+  zone,
+  initialStop,
+}: {
+  zone: Zone;
+  initialStop?: string | undefined;
+}) {
   const { t, lang } = useI18n();
   const zoneStops = stops[zone];
   const config = fareConfigs.find((item) => item.zone === zone)!;
-  const [selected, setSelected] = useState<string[]>([zoneStops[0]!.id]);
+  const [selected, setSelected] = useState<string[]>([
+    zoneStops.find((stop) => stop.id === initialStop)?.id ?? zoneStops[0]!.id,
+  ]);
   const [vehicle, setVehicle] = useState<VehicleType>("sedan");
   const [pickup, setPickup] = useState("");
   const [departure, setDeparture] = useState<MapPoint>(DEFAULT_ORIGIN_POINTS[zone]);
@@ -45,12 +54,21 @@ export function ZiyaratBooking({ zone }: { zone: Zone }) {
   const sending = useRef(false);
   const fixed = DEFAULT_ORIGIN_POINTS[zone];
   useEffect(() => {
-    const draft = readMapDraft(zone);
+    if (initialStop && zoneStops.some((stop) => stop.id === initialStop)) {
+      setSelected([initialStop]);
+      setDeparture(DEFAULT_ORIGIN_POINTS[zone]);
+      setDestination(null);
+      setPickup("");
+      clearMapDraft();
+    }
+  }, [initialStop, zone, zoneStops]);
+  useEffect(() => {
+    const draft = initialStop ? null : readMapDraft(zone);
     if (draft) {
       setDeparture(draft.departure ?? DEFAULT_ORIGIN_POINTS[zone]);
       setDestination(draft.destination);
     }
-  }, [zone]);
+  }, [zone, initialStop]);
   const manual =
     pickup.trim().length > 0 ||
     destination !== null ||
@@ -181,6 +199,16 @@ export function ZiyaratBooking({ zone }: { zone: Zone }) {
             </p>
           )}
           <p className="text-sm text-muted-foreground">{t("booking_not_confirmed")}</p>
+          {receipt.trackingToken && (
+            <BookingTracking id={receipt.id} trackingToken={receipt.trackingToken} />
+          )}
+          <p className="text-xs text-muted-foreground">
+            {lang === "ar"
+              ? "احتفظ بهذه الصفحة مفتوحة لتحديثات الرحلة. رمز التتبع خاص بهذه الجلسة ولا يُحفظ على جهازك."
+              : lang === "ur"
+                ? "سفر کی تازہ معلومات کے لیے یہ صفحہ کھلا رکھیں۔ نجی ٹریکنگ ٹوکن صرف اسی سیشن میں رہتا ہے۔"
+                : "Keep this receipt page open for trip updates. Your private tracking access stays in this page only and is not stored on this device."}
+          </p>
           <Button
             type="button"
             onClick={() => {
@@ -306,6 +334,13 @@ export function ZiyaratBooking({ zone }: { zone: Zone }) {
               <CardTitle className="text-base">{t("select_places")}</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2 sm:grid-cols-2">
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                {lang === "ar"
+                  ? "هذه تقديرات نقل منفردة، لا رسوم دخول. لا تجمع أجور البطاقات؛ تحسب الأجرة الأساسية مرة واحدة في الملخص. النقاط المخصصة تحتاج عرض سعر."
+                  : lang === "ur"
+                    ? "یہ الگ نقل و حمل کے تخمینے ہیں، داخلہ ٹکٹ نہیں۔ کارڈ کی قیمتیں جمع نہ کریں؛ بنیادی کرایہ خلاصے میں ایک بار لگتا ہے۔ حسب ضرورت مقامات کے لیے کوٹیشن درکار ہے۔"
+                    : "Individual transport estimates, not admission tickets. Do not add card prices: the summary charges the base fare once. Custom points require a quote."}
+              </p>
               {zoneStops.map((stop) => (
                 <label
                   key={stop.id}
@@ -322,7 +357,26 @@ export function ZiyaratBooking({ zone }: { zone: Zone }) {
                     }
                   />
                   <span className="flex-1 text-sm">{stopName(stop)}</span>
-                  {!manual && <span className="text-xs text-muted-foreground">{stop.km} km</span>}
+                  <span className="text-end text-xs text-muted-foreground">
+                    <strong className="block text-primary">
+                      {
+                        calcFare({
+                          config,
+                          km: stop.km,
+                          vehicleMultiplier: vehicles.find((item) => item.id === vehicle)!
+                            .multiplier,
+                          surgeOn: false,
+                          discountPct: 0,
+                        }).total
+                      }{" "}
+                      {t("currency")}
+                    </strong>
+                    {lang === "ar"
+                      ? "تقدير منفرد من نقطة البداية"
+                      : lang === "ur"
+                        ? "مقررہ آغاز سے الگ تخمینہ"
+                        : "Standalone estimate from fixed origin"}
+                  </span>
                 </label>
               ))}
             </CardContent>

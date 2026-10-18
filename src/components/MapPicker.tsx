@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { DEFAULT_ORIGIN_POINTS, type MapEndpoint, type MapPoint } from "@/lib/map-locations";
 import type { Zone } from "@/lib/mock-data";
+import { PlaceSearch, PlaceSearchNote } from "@/components/PlaceSearch";
 
 const OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
@@ -130,6 +131,15 @@ export function MapPicker({
         .addTo(map);
       destinationMarkerRef.current.getElement().setAttribute("aria-label", "Destination pin");
     }
+    if (departure && destination) {
+      const bounds = new maplibre.LngLatBounds()
+        .extend([departure.lng, departure.lat])
+        .extend([destination.lng, destination.lat]);
+      map.fitBounds(bounds, { padding: 55, maxZoom: 14, duration: 0 });
+    } else if (departure || destination) {
+      const point = (departure || destination)!;
+      map.jumpTo({ center: [point.lng, point.lat], zoom: 14 });
+    }
   }, [mapReady, departure, destination]);
 
   const pointSummary = (label: string, field: MapEndpoint, point: MapPoint | null) => (
@@ -154,6 +164,23 @@ export function MapPicker({
 
   return (
     <div className="space-y-3" dir={dir}>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {(["departure", "destination"] as const).map((field) => (
+          <PlaceSearch
+            key={`${zone}-${field}`}
+            zone={zone}
+            field={field}
+            point={field === "departure" ? departure : destination}
+            onPick={(point) => onPick(field, point)}
+            onMap={() => {
+              onActiveFieldChange(field);
+              mapHostRef.current?.scrollIntoView({ behavior: "auto", block: "center" });
+              mapHostRef.current?.focus({ preventScroll: true });
+            }}
+          />
+        ))}
+      </div>
+      <PlaceSearchNote />
       <div className="flex flex-wrap gap-2" role="group" aria-label={t("map_choose_point_type")}>
         <Button
           type="button"
@@ -183,7 +210,13 @@ export function MapPicker({
       </div>
 
       <div className="relative h-[320px] w-full overflow-hidden rounded-lg border border-border bg-muted">
-        <div ref={mapHostRef} className="absolute inset-0" aria-label={t("map_picker_title")} />
+        <div
+          ref={mapHostRef}
+          tabIndex={-1}
+          className="absolute inset-0"
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+          aria-label={t("map_picker_title")}
+        />
         {!mapReady && !mapError && (
           <div className="pointer-events-none absolute inset-x-3 top-3 z-10 rounded-md bg-background/90 px-3 py-2 text-xs text-muted-foreground shadow">
             {t("map_loading")}

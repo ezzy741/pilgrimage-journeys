@@ -3,18 +3,22 @@ import { ZiyaratBooking } from "@/components/ZiyaratBooking";
 import { useI18n } from "@/lib/i18n";
 
 export const Route = createFileRoute("/ziyarat/makkah")({
+  validateSearch: (search: Record<string, unknown>): { stop?: string | undefined } => ({
+    stop: typeof search["stop"] === "string" ? search["stop"].slice(0, 60) : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Makkah Ziyarat Rides — Jabal al-Nour, Mina, Arafat" },
       {
         name: "description",
         content:
-          "Book a Makkah Ziyarat tour with sedan, SUV or HiAce. Transparent fares from 150 SAR with verified drivers.",
+          "Book a Makkah Ziyarat tour with sedan, SUV or HiAce. Transparent fares from 150 SAR subject to business review.",
       },
       { property: "og:title", content: "Makkah Ziyarat Rides" },
       {
         property: "og:description",
-        content: "Ziyarat tours across Makkah landmarks with instant fare calculation.",
+        content:
+          "Ziyarat tours across Makkah landmarks with estimated fares and business confirmation.",
       },
     ],
   }),
@@ -23,11 +27,12 @@ export const Route = createFileRoute("/ziyarat/makkah")({
 
 function MakkahPage() {
   const { t } = useI18n();
+  const { stop } = Route.useSearch();
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <h1 className="text-2xl font-bold text-primary">{t("makkah_title")}</h1>
       <p className="mb-6 text-sm text-muted-foreground">{t("makkah_sub")}</p>
-      <ZiyaratBooking zone="makkah" />
+      <ZiyaratBooking zone="makkah" initialStop={stop} />
     </div>
   );
 }
